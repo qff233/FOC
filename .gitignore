@@ -1,0 +1,8 @@
+cmake-build-debug
+build
+.cache
+.cproject
+.mxproject
+.project
+.idea
+compile_commands.json
