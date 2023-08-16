@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "common.h"
+
 // int array instead of float array
 // 4x200 points per 360 deg
 // 2x storage save (int 2Byte float 4 Byte )
@@ -96,4 +98,12 @@ float _sqrtApprox(float number)
     y = *(float*) &i;
     // y = y * ( f - ( x * y * y ) ); // better precision
     return number * y;
+}
+
+uint64_t get_microsecond() {
+    uint32_t m = HAL_GetTick();
+    uint32_t tms = SysTick->LOAD + 1;
+    uint32_t u = tms - SysTick->VAL;
+
+    return (m * 1000 + (u * 1000) / tms);
 }

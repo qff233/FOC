@@ -7,9 +7,12 @@
 #include "i2c.h"
 #include "main.h"
 #include "spi.h"
+#include "stm32f1xx_hal.h"
 #include "task.h"
 #include "tim.h"
 #include "usart.h"
+
+#include <stdint.h>
 
 void Main();
 

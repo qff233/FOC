@@ -1,6 +1,5 @@
 #include "cmsis_os2.h"
 #include "common.h"
-#include "projdefs.h"
 
 osThreadId_t ctrl_loop_task_handle;
 void thread_ctrl_loop(void *argument) {

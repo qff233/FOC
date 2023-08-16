@@ -1,11 +1,15 @@
 #ifndef __FOC_UTILS_H
 #define __FOC_UTILS_H
 
+#include <stdint.h>
+
 // sign function
-#define _sign(a) ( ( (a) < 0 )  ?  -1   : ( (a) > 0 ) )
-#define _round(x) ((x)>=0?(long)((x)+0.5f):(long)((x)-0.5f))
-#define _constrain(amt, low, high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+#define _sign(a) (((a) < 0) ? -1 : ((a) > 0))
+#define _round(x) ((x) >= 0 ? (long)((x) + 0.5f) : (long)((x)-0.5f))
+#define _constrain(amt, low, high)                                             \
+  ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
 #define _sqrt(a) (_sqrtApprox(a))
+#define _isset(a) ((a) != (NOT_SET))
 
 #define _2_SQRT3 1.15470053838f
 #define _SQRT3 1.73205080757f
@@ -20,23 +24,32 @@
 #define _3PI_2 4.71238898038f
 #define _PI_6 0.52359877559f
 
+#define NOT_SET -12345.0
+
 // dq voltage structs
 struct DQVoltage {
-    float d;
-    float q;
+  float d;
+  float q;
 };
 
 // dq current structure
 struct DQCurrent {
-    float d;
-    float q;
+  float d;
+  float q;
 };
 
 struct PhaseCurrent {
-    float a;
-    float b;
-    float c;
+  float a;
+  float b;
+  float c;
 };
+
+struct PhaseVoltage {
+  float a;
+  float b;
+  float c;
+};
+
 /**
  *  Function approximating the sine calculation by using fixed size array
  * - execution time ~40us (Arduino UNO)
@@ -58,7 +71,6 @@ float _cos(float a);
  */
 float _normalizeAngle(float angle);
 
-
 /**
  * Electrical angle calculation
  *
@@ -74,5 +86,7 @@ float _electricalAngle(float shaft_angle, int pole_pairs);
  * @param value - number
  */
 float _sqrtApprox(float value);
+
+uint64_t get_microsecond();
 
 #endif //__FOC_UTILS_H
