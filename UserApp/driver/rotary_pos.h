@@ -1,5 +1,5 @@
-#ifndef __SENSOR_ROTARY_POS_H__
-#define __SENSOR_ROTARY_POS_H__
+#ifndef __DRIVER_ROTARY_POS_H__
+#define __DRIVER_ROTARY_POS_H__
 
 #include "common.h"
 

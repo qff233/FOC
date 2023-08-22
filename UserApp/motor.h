@@ -2,10 +2,11 @@
 #define __MOTOR_H__
 
 #include "common.h"
+#include "driver/rotary_pos.h"
+#include "driver/motor_pwm.h"
 #include "foc_utils.h"
 #include "math/lowpass_filter.h"
 #include "math/pid.h"
-#include "sensor/rotary_pos.h"
 
 enum class MotorControlMode {
   // TORQUE,
@@ -44,7 +45,7 @@ struct MotorState {
 
 class Motor {
 public:
-  Motor(int pole_pairs, float phase_resistance = NOT_SET);
+  Motor(int pole_pairs, MotorPWM& motor_pwm,float phase_resistance = NOT_SET);
 
   void update();
   void init();
@@ -59,12 +60,13 @@ public:
 private:
   float get_electrical_angle();
   void align_rotary_pos_sensor();
-  void set_phase_voltage(float voltage_q, float voltage_d,
-                         float electrical_angle);
-  void angle_close_loop_tick(float target);
-  void velocity_close_loop_tick(float target);
-  void angle_open_loop_tick(float target);
-  void velocity_open_loop_tick(float target);
+  // void measure_phase_resistance();
+  void set_phase_voltage(float voltage_q, float electrical_angle);
+
+  void on_angle_close_loop_tick(float target);
+  void on_velocity_close_loop_tick(float target);
+  void on_angle_open_loop_tick(float target);
+  void on_velocity_open_loop_tick(float target);
 
 private:
   MotorConfig m_config;
@@ -75,10 +77,11 @@ private:
 
   int m_pole_pairs;
   float m_phase_resistance;
-  float m_zero_electric_angle_offset = NOTSET;
+  float m_zero_electric_angle_offset = NOT_SET;
 
   bool m_enable = false;
 
+  MotorPWM& m_motor_pwm;
   RotaryPosSensor *m_rotarypos_sensor = nullptr;
 };
 
