@@ -7,9 +7,8 @@
 #define _sign(a) (((a) < 0) ? -1 : ((a) > 0))
 #define _round(x) ((x) >= 0 ? (long)((x) + 0.5f) : (long)((x)-0.5f))
 #define _constrain(amt, low, high)                                             \
-  ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
+    ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
 #define _sqrt(a) (_sqrtApprox(a))
-#define _isset(a) ((a) != (NOT_SET))
 
 #define _2_SQRT3 1.15470053838f
 #define _SQRT3 1.73205080757f
@@ -24,30 +23,28 @@
 #define _3PI_2 4.71238898038f
 #define _PI_6 0.52359877559f
 
-#define NOT_SET -12345.0
-
 // dq voltage structs
 struct DQVoltage {
-  float d;
-  float q;
+    float d = 0.0f;
+    float q = 0.0f;
 };
 
 // dq current structure
 struct DQCurrent {
-  float d;
-  float q;
+    float d = 0.0f;
+    float q = 0.0f;
 };
 
 struct PhaseCurrent {
-  float a;
-  float b;
-  float c;
+    float a = 0.0f;
+    float b = 0.0f;
+    float c = 0.0f;
 };
 
 struct PhaseVoltage {
-  float a;
-  float b;
-  float c;
+    float a = 0.0f;
+    float b = 0.0f;
+    float c = 0.0f;
 };
 
 /**
