@@ -15,6 +15,12 @@ enum class MotorControlMode {
     VELOCITY_OPEN_LOOP,
 };
 
+enum class MotorAlignError {
+    None,
+    POLE_PAIR_MISMATCH,
+    FAILD_TO_MOVE,
+};
+
 struct MotorConfig {
 
     int pole_pairs;
@@ -51,8 +57,9 @@ class Motor {
     void update();
     void init();
 
-    MotorConfig &get_config();
-    const MotorSensorState &get_sensor_value();
+    const MotorConfig &get_config() const;
+    const MotorSensorState &get_sensor_value() const;
+    MotorAlignError get_error() const;
 
     void set_target(float target);
     void set_enable(bool enable);
@@ -87,6 +94,7 @@ class Motor {
 
     MotorPWM &m_motor_pwm;
     RotaryPosSensor *m_rotarypos_sensor = nullptr;
+    MotorAlignError m_error;
 };
 
 #endif

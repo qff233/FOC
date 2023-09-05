@@ -32,7 +32,7 @@ void Motor::init() {
 
 void Motor::update() {
     if (m_rotarypos_sensor) {
-        m_rotarypos_sensor->update(); 
+        m_rotarypos_sensor->update();
         m_state.raw_angle = m_rotarypos_sensor->get_full_angle();
         m_state.est_angle = m_config.lowpass_angle(m_state.raw_angle);
         m_state.raw_velocity = m_rotarypos_sensor->get_velocity();
@@ -78,9 +78,11 @@ void Motor::set_torque_limit(float val) {
 
 void Motor::set_model(MotorControlMode model) { m_model = model; }
 
-MotorConfig &Motor::get_config() { return m_config; }
+const MotorConfig& Motor::get_config() const { return m_config; }
 
-const MotorSensorState &Motor::get_sensor_value() { return m_state; }
+const MotorSensorState& Motor::get_sensor_value() const { return m_state; }
+
+MotorAlignError Motor::get_error() const { return m_error; }
 
 void Motor::attach_rotary_pos_sensor(RotaryPosSensor *sensor) {
     if (!sensor)
@@ -106,7 +108,49 @@ float Motor::get_electrical_angle() {
     return _normalizeAngle(output - m_zero_electric_angle_offset);
 }
 
-void Motor::align_rotary_pos_sensor() {}
+void Motor::align_rotary_pos_sensor() {
+    if (!m_rotarypos_sensor)
+        return;
+
+    for (int i = 0; i < 500; ++i) {
+        float angle = _3PI_2 + _2PI * (float)i / 500.0f;
+        this->set_phase_voltage(m_config.voltage_used_for_sensor_align, angle);
+        HAL_Delay(2);
+    }
+
+    m_rotarypos_sensor->update();
+    float mid_angle = m_rotarypos_sensor->get_full_angle();
+
+    for (int i = 500; i >= 0; --i) {
+        float angle = _3PI_2 + _2PI * (float)i / 500.0f;
+        this->set_phase_voltage(m_config.voltage_used_for_sensor_align, angle);
+        HAL_Delay(2);
+    }
+    m_rotarypos_sensor->update();
+    float end_angle = m_rotarypos_sensor->get_full_angle();
+    this->set_phase_voltage(0, 0);
+    if (mid_angle == end_angle) {
+        // TODO: throw error
+        return;
+    }
+
+    if (mid_angle < end_angle)
+        m_rotarypos_sensor->set_direction(RotaryDirection::CCW);
+    else
+        m_rotarypos_sensor->set_direction(RotaryDirection::CW);
+    // check pole pair number
+    float delta_angle = std::fabs(mid_angle - end_angle);
+    if (std::fabs(delta_angle * m_config.pole_pairs - _2PI) > 0.5f) {
+        // TODO: throw error
+        return;
+    }
+
+    this->set_phase_voltage(m_config.voltage_used_for_sensor_align, _3PI_2);
+    HAL_Delay(1000);
+    m_rotarypos_sensor->update();
+    m_zero_electric_angle_offset = this->get_electrical_angle();
+    this->set_phase_voltage(0, 0);
+}
 
 void Motor::set_phase_voltage(float voltage_q, float electrical_angle) {
     voltage_q = voltage_q / m_motor_pwm.voltage_power_supply;
@@ -166,7 +210,8 @@ void Motor::set_phase_voltage(float voltage_q, float electrical_angle) {
 }
 
 void Motor::on_angle_close_loop_tick() {
-    float target_velocity = m_config.pid_angle(m_target_angle - m_state.est_angle);
+    float target_velocity =
+        m_config.pid_angle(m_target_angle - m_state.est_angle);
     float q = m_config.pid_velocity(target_velocity - m_state.est_velocity);
     set_phase_voltage(q, m_state.est_angle);
 }
