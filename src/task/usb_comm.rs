@@ -9,9 +9,7 @@ enum State {
     Reply,
 }
 
-pub async fn usb_comm_task<'d, T: usb::Instance + 'd>(
-    class: &mut CdcAcmClass<'d, usb::Driver<'d, T>>,
-) {
+pub async fn usb_comm_task<'d, T: usb::Instance>(class: &mut CdcAcmClass<'d, usb::Driver<'d, T>>) {
     let current_state = State::Reply;
     let mut buf = [0; 64];
     loop {
