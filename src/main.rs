@@ -1,12 +1,12 @@
 #![no_std]
 #![no_main]
 
+use cortex_m_rt::entry;
 use defmt::*;
 
-use lazy_static::lazy_static;
 use static_cell::StaticCell;
 
-use embassy_executor::Spawner;
+use embassy_executor::{Executor, InterruptExecutor};
 use embassy_stm32::adc::{Adc, SampleTime};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::time::{khz, mhz};
@@ -33,19 +33,11 @@ bind_interrupts!(struct Irqs {
     FDCAN1_IT1 => can::IT1InterruptHandler<peripherals::FDCAN1>;
 });
 
-pub struct GlobalPeripherals {
-    pub usb_class: CdcAcmClass<'static, usb::Driver<'static, peripherals::USB>>,
-    pub can: can::Fdcan<'static, peripherals::FDCAN1>,
-    pub pwm: ComplementaryPwm<'static, peripherals::TIM1>,
-    pub adc: Adc<'static, peripherals::ADC1>,
-}
+static EXECUTOR_CURRENT_LOOP: InterruptExecutor = InterruptExecutor::new();
+static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 
-lazy_static! {
-    static ref GLOBALPERIPHERALS: StaticCell<GlobalPeripherals> = StaticCell::new();
-}
-
-#[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+#[entry]
+fn main() -> ! {
     let mut config = Config::default();
     let p = {
         use embassy_stm32::rcc::*;
@@ -72,7 +64,7 @@ async fn main(_spawner: Spawner) {
     ////////////////////////////////////////////////////////////
     // Init USB Driver
     info!("Init USB Driver...");
-    let (mut usb, usb_class) = {
+    let (usb, usb_class) = {
         let driver = usb::Driver::new(p.USB, Irqs, p.PA12, p.PA11);
         let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
         config.manufacturer = Some("Embassy");
@@ -106,7 +98,6 @@ async fn main(_spawner: Spawner) {
         let usb = builder.build();
         (usb, usb_class)
     };
-
     ////////////////////////////////////////////////////////////
     // Init CAN
     info!("Init CAN Driver...");
@@ -121,7 +112,6 @@ async fn main(_spawner: Spawner) {
         // let mut can = can.start(can::FdcanOperatingMode::InternalLoopbackMode);
         can.start(can::FdcanOperatingMode::NormalOperationMode)
     };
-
     ////////////////////////////////////////////////////////////
     // Init PWM
     info!("Init PWM Driver...");
@@ -133,10 +123,6 @@ async fn main(_spawner: Spawner) {
         let w_h = PwmPin::new_ch3(p.PA10, embassy_stm32::gpio::OutputType::PushPull);
         let w_l = ComplementaryPwmPin::new_ch3(p.PB15, embassy_stm32::gpio::OutputType::PushPull);
         // let u_h = PwmPin::new_ch1(p.PA8, embassy_stm32::gpio::OutputType::PushPull);
-        unsafe {
-            interrupt::TIM1_UP_TIM16.enable();
-        }
-        interrupt::TIM1_UP_TIM16.set_priority(Priority::P6);
         ComplementaryPwm::new(
             p.TIM1,
             Some(u_h),
@@ -151,7 +137,6 @@ async fn main(_spawner: Spawner) {
             CountingMode::CenterAlignedUpInterrupts,
         )
     };
-
     ////////////////////////////////////////////////////////////
     // Init ADC
     info!("Init ADC Driver...");
@@ -161,17 +146,20 @@ async fn main(_spawner: Spawner) {
         adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
         adc
     };
-
     ////////////////////////////////////////////////////////////
-    GLOBALPERIPHERALS.init(GlobalPeripherals {
-        usb_class,
-        can,
-        pwm,
-        adc,
-    });
 
-    usb.run().await;
+    interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
+    let spawner = EXECUTOR_CURRENT_LOOP.start(interrupt::TIM1_UP_TIM16);
+    spawner.spawn(task::current_loop(pwm, adc)).unwrap();
+
+    let executor = EXECUTOR_COMM.init(Executor::new());
+    executor.run(|spawner| {
+        spawner.spawn(task::usb_comm(usb, usb_class)).unwrap();
+        spawner.spawn(task::can_comm(can)).unwrap();
+    })
 }
 
 #[interrupt]
-fn TIM1_UP_TIM16() {}
+unsafe fn TIM1_UP_TIM16() {
+    EXECUTOR_CURRENT_LOOP.on_interrupt()
+}
