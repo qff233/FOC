@@ -44,6 +44,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 heapless = { version = "0.8", default-features = false }
 
 static_cell = "2.0"
+lazy_static = { version = "1.0", features = ["spin_no_std"] }
 
 pid = "4.0"
 
