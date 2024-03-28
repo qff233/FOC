@@ -23,7 +23,6 @@ use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwm
 
 use {defmt_rtt as _, panic_probe as _};
 
-mod foc;
 mod task;
 // use task::can_comm_task;
 
@@ -61,6 +60,7 @@ fn main() -> ! {
     };
 
     info!("System starting...");
+
     ////////////////////////////////////////////////////////////
     // Init USB Driver
     info!("Init USB Driver...");
@@ -98,11 +98,12 @@ fn main() -> ! {
         let usb = builder.build();
         (usb, usb_class)
     };
+
     ////////////////////////////////////////////////////////////
     // Init CAN
     info!("Init CAN Driver...");
     let can = {
-        let mut can = can::FdcanConfigurator::new(p.FDCAN1, p.PB8, p.PB9, Irqs);
+        let mut can = can::CanConfigurator::new(p.FDCAN1, p.PB8, p.PB9, Irqs);
         can.set_extended_filter(
             can::filter::ExtendedFilterSlot::_0,
             can::filter::ExtendedFilter::accept_all_into_fifo1(),
@@ -110,8 +111,9 @@ fn main() -> ! {
         can.set_bitrate(250_000);
         // can.set_fd_data_bitrate(1_000_000, false);  // use fdcan
         // let mut can = can.start(can::FdcanOperatingMode::InternalLoopbackMode);
-        can.start(can::FdcanOperatingMode::NormalOperationMode)
+        can.start(can::OperatingMode::NormalOperationMode)
     };
+
     ////////////////////////////////////////////////////////////
     // Init PWM
     info!("Init PWM Driver...");
@@ -137,6 +139,7 @@ fn main() -> ! {
             CountingMode::CenterAlignedUpInterrupts,
         )
     };
+
     ////////////////////////////////////////////////////////////
     // Init ADC
     info!("Init ADC Driver...");
@@ -146,8 +149,8 @@ fn main() -> ! {
         adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
         adc
     };
-    ////////////////////////////////////////////////////////////
 
+    ////////////////////////////////////////////////////////////
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
     let spawner = EXECUTOR_CURRENT_LOOP.start(interrupt::TIM1_UP_TIM16);
     spawner.spawn(task::current_loop(pwm, adc)).unwrap();

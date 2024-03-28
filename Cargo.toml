@@ -1,59 +1,6 @@
-[package]
-name = "foc"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", features = [
-    "defmt",
-    "time-driver-any",
-    "stm32g474re",
-    "memory-x",
-    "unstable-pac",
-    "exti",
-] }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy", features = [
-    "defmt",
-] }
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", features = [
-    "arch-cortex-m",
-    "executor-thread",
-    "executor-interrupt",
-    "defmt",
-    "integrated-timers",
-] }
-embassy-time = { git = "https://github.com/embassy-rs/embassy", features = [
-    "defmt",
-    "defmt-timestamp-uptime",
-] }
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
-embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = [
-    "defmt",
-] }
-embassy-futures = { git = "https://github.com/embassy-rs/embassy" }
-
-defmt = "0.3"
-defmt-rtt = "0.4"
-
-cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
-cortex-m-rt = "0.7.0"
-embedded-hal = "1.0"
-panic-probe = { version = "0.3", features = ["print-defmt"] }
-heapless = { version = "0.8", default-features = false }
-
-static_cell = "2.0"
-lazy_static = { version = "1.0", features = ["spin_no_std"] }
-
-pid = "4.0"
-
-[profile.dev]
-debug = true
-lto = true
-opt-level = "s"
-
-[profile.release]
-lto = true
-debug = true
-opt-level = "s"
+[workspace]
+members = [
+    "crates/stm32-g474",
+    "crates/foc"
+]
+resolver = "2"
