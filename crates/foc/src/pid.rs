@@ -7,10 +7,9 @@ pub struct PID {
     pub output_ramp: f32,
     pub output_limit: f32,
     pub integral_limit: f32,
-
-    last_error: f32,
-    last_output: f32,
-    last_integral: f32,
+    pub last_output: f32,
+    pub last_error: f32,
+    pub last_integral: f32,
 }
 
 impl PID {
@@ -39,7 +38,7 @@ impl PID {
     }
 
     #[allow(dead_code)]
-    fn update(&mut self, error: f32) -> f32 {
+    pub fn update(&mut self, error: f32) -> f32 {
         let dt = self.time_interval;
 
         let p_term = self.p * error;
