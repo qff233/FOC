@@ -14,7 +14,7 @@ use embassy_stm32::timer::simple_pwm::PwmPin;
 use embassy_stm32::{bind_interrupts, Config};
 use embassy_stm32::{can, usb};
 use embassy_stm32::{interrupt, peripherals};
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Delay;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
@@ -39,7 +39,7 @@ bind_interrupts!(struct Irqs {
 static EXECUTOR_FOC_LOOP: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 
-type FocMutex = Mutex<ThreadModeRawMutex, Option<foc::FOC>>;
+type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::FOC>>;
 
 #[entry]
 fn main() -> ! {
@@ -192,16 +192,15 @@ fn main() -> ! {
     info!("Init PWM Interrupt...");
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
-    spawner
-        .spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms))
-        .unwrap();
+    unwrap!(spawner.spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms)));
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();
     spawner.spawn(task::position_loop(&FOC)).unwrap();
 
+    info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
-        spawner.spawn(task::usb_comm(usb, usb_class)).unwrap();
-        spawner.spawn(task::can_comm(can)).unwrap();
+        unwrap!(spawner.spawn(task::usb_comm(usb, usb_class)));
+        unwrap!(spawner.spawn(task::can_comm(can)));
     });
 }
 

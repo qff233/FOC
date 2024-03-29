@@ -8,22 +8,29 @@ pub mod current_sensor;
 
 pub mod driver;
 
-use angle_sensor::AngleSensor;
+use angle_sensor::{AngleSensor, SensorType};
 use current_sensor::CurrentSensor;
 use driver::interface::{Adcs, Pwms};
 use pid::PID;
 use utils::{inv_park, park, svpwm};
 
-pub enum Error {
-    MisCurrentSensor,
-    MisAngleSensor,
-
-    NoRequireVelocityLoop,
-    NoRequirePositionLoop,
-
+pub enum SetError {
     NoRequireSetCurrent,
     NoRequireSetVelocity,
     NoRequireSetPosition,
+}
+
+pub enum CurrentLoopError {
+    MisCurrentSensor,
+    MisAngleSensor,
+}
+
+pub enum VelocityLoopError {
+    NoRequireVelocityLoop,
+}
+
+pub enum PositionLoopError {
+    NoRequirePositionLoop,
 }
 
 #[allow(dead_code)]
@@ -106,8 +113,13 @@ impl FOC {
         current_sensor: &Option<CurrentSensor>,
         angle_sensor: &impl AngleSensor,
         voltage_adc: &mut impl Adcs,
-    ) -> Result<(), Error> {
-        let current_sensor = current_sensor.as_ref().ok_or(Error::MisCurrentSensor)?;
+    ) -> Result<(), CurrentLoopError> {
+        let current_sensor = current_sensor
+            .as_ref()
+            .ok_or(CurrentLoopError::MisCurrentSensor)?;
+        if let SensorType::NoSensor = angle_sensor.get_type() {
+            return Err(CurrentLoopError::MisAngleSensor);
+        }
 
         let last_position = *current_position;
         *current_position = angle_sensor.get_angle() * pole_num as f32;
@@ -121,10 +133,10 @@ impl FOC {
     pub fn current_tick(
         &mut self,
         bus_voltage: f32,
-        angle_sensor: &impl AngleSensor,
+        angle_sensor: &mut impl AngleSensor,
         voltage_adc: &mut impl Adcs,
         pwm: &mut impl Pwms,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CurrentLoopError> {
         let (ud, uq, angle) = match &mut self.loop_mode {
             LoopMode::OpenVelocity {
                 voltage,
@@ -195,7 +207,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    pub fn velocity_tick(&mut self) -> Result<(), Error> {
+    pub fn velocity_tick(&mut self) -> Result<(), VelocityLoopError> {
         match &mut self.loop_mode {
             LoopMode::OpenVelocity {
                 voltage: _,
@@ -222,7 +234,7 @@ impl FOC {
                 current_pid: _,
                 expect_current: _,
             } => {
-                return Err(Error::NoRequireVelocityLoop);
+                return Err(VelocityLoopError::NoRequireVelocityLoop);
             }
             LoopMode::Velocity {} => {
                 //TODO 等大佬写无感
@@ -232,7 +244,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    pub fn position_tick(&mut self) -> Result<(), Error> {
+    pub fn position_tick(&mut self) -> Result<(), PositionLoopError> {
         match &mut self.loop_mode {
             LoopMode::PositionWithSensor {
                 current_pid: _,
@@ -243,14 +255,14 @@ impl FOC {
                 position_pid.update(*expect_position - self.current_position);
             }
             _ => {
-                return Err(Error::NoRequireVelocityLoop);
+                return Err(PositionLoopError::NoRequirePositionLoop);
             }
         }
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn set_expect_current(&mut self, current: f32) -> Result<(), Error> {
+    pub fn set_expect_current(&mut self, current: f32) -> Result<(), SetError> {
         match &mut self.loop_mode {
             LoopMode::TorqueWithSensor {
                 current_pid: _,
@@ -259,12 +271,12 @@ impl FOC {
                 *expect_current = current;
                 Ok(())
             }
-            _ => Err(Error::NoRequireSetCurrent),
+            _ => Err(SetError::NoRequireSetCurrent),
         }
     }
 
     #[allow(dead_code)]
-    pub fn set_expect_velocity(&mut self, velocity: f32) -> Result<(), Error> {
+    pub fn set_expect_velocity(&mut self, velocity: f32) -> Result<(), SetError> {
         match &mut self.loop_mode {
             LoopMode::OpenVelocity {
                 voltage: _,
@@ -282,12 +294,12 @@ impl FOC {
                 Ok(())
             }
             LoopMode::Velocity {} => Ok(()),
-            _ => Err(Error::NoRequireSetVelocity),
+            _ => Err(SetError::NoRequireSetVelocity),
         }
     }
 
     #[allow(dead_code)]
-    pub fn set_expect_position(&mut self, position: f32) -> Result<(), Error> {
+    pub fn set_expect_position(&mut self, position: f32) -> Result<(), SetError> {
         match &mut self.loop_mode {
             LoopMode::PositionWithSensor {
                 current_pid: _,
@@ -298,7 +310,7 @@ impl FOC {
                 *expect_position = position;
                 Ok(())
             }
-            _ => Err(Error::NoRequireSetPosition),
+            _ => Err(SetError::NoRequireSetPosition),
         }
     }
 

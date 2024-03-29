@@ -1,11 +1,14 @@
 // use embassy_stm32::{can::Fdcan, peripherals::FDCAN1};
 // use embassy_time::Timer;
 
+use defmt::info;
 use embassy_stm32::{can, peripherals};
+use embassy_time::Timer;
 
 #[embassy_executor::task]
 pub async fn can_comm(_can: can::Can<'static, peripherals::FDCAN1>) {
     loop {
-        //         Timer::after_secs(10).await;
+        info!("can");
+        Timer::after_micros(1).await;
     }
 }
