@@ -10,7 +10,7 @@ pub struct CurrentSensor {
 
 impl CurrentSensor {
     #[allow(dead_code)]
-    pub fn new(sampling_resistor: f32, adc: &impl Adcs, delay: &mut impl delay::DelayNs) -> Self {
+    pub fn new(sampling_resistor: f32, adc: &mut impl Adcs, delay: &mut impl delay::DelayNs) -> Self {
         let voltage_offset = {
             let (mut uc, mut vc, mut wc) = (0., 0., 0.);
             for _ in 0..500 {
@@ -29,7 +29,7 @@ impl CurrentSensor {
     }
 
     #[allow(dead_code)]
-    pub fn get_currnet(&self, adc: &impl Adcs) -> (f32, f32, f32) {
+    pub fn get_currnet(&self, adc: &mut impl Adcs) -> (f32, f32, f32) {
         let (u, v, w) = adc.get_voltage();
         let (u_offset, v_offset, w_offset) = self.voltage_offset;
         let u_current = (u - u_offset) / self.sampling_resistor;

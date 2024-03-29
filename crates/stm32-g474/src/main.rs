@@ -3,28 +3,32 @@
 
 use cortex_m_rt::entry;
 use defmt::*;
-
-use static_cell::StaticCell;
-
 use embassy_executor::{Executor, InterruptExecutor};
+use embassy_futures::block_on;
 use embassy_stm32::adc::{Adc, SampleTime};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::time::{khz, mhz};
+use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::CountingMode;
 use embassy_stm32::timer::simple_pwm::PwmPin;
 use embassy_stm32::{bind_interrupts, Config};
 use embassy_stm32::{can, usb};
 use embassy_stm32::{interrupt, peripherals};
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::mutex::Mutex;
 use embassy_time::Delay;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
+use foc::current_sensor::CurrentSensor;
+use foc::{LoopMode, MotorParams};
+use static_cell::StaticCell;
 
-use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
+use crate::interface::{Adcs, Pwms};
 
 use {defmt_rtt as _, panic_probe as _};
 
+mod interface;
 mod task;
-// use task::can_comm_task;
 
 bind_interrupts!(struct Irqs {
     USB_LP => usb::InterruptHandler<peripherals::USB>;
@@ -32,8 +36,10 @@ bind_interrupts!(struct Irqs {
     FDCAN1_IT1 => can::IT1InterruptHandler<peripherals::FDCAN1>;
 });
 
-static EXECUTOR_CURRENT_LOOP: InterruptExecutor = InterruptExecutor::new();
+static EXECUTOR_FOC_LOOP: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
+
+type FocMutex = Mutex<ThreadModeRawMutex, Option<foc::FOC>>;
 
 #[entry]
 fn main() -> ! {
@@ -100,7 +106,6 @@ fn main() -> ! {
     };
 
     ////////////////////////////////////////////////////////////
-    // Init CAN
     info!("Init CAN Driver...");
     let can = {
         let mut can = can::CanConfigurator::new(p.FDCAN1, p.PB8, p.PB9, Irqs);
@@ -141,7 +146,6 @@ fn main() -> ! {
     };
 
     ////////////////////////////////////////////////////////////
-    // Init ADC
     info!("Init ADC Driver...");
     let adc = {
         let mut adc = Adc::new(p.ADC1, &mut Delay);
@@ -151,18 +155,49 @@ fn main() -> ! {
     };
 
     ////////////////////////////////////////////////////////////
+    info!("Init FOC...");
+    let mut block_delay = embassy_time::Delay;
+    let pwms = Pwms::new(pwm);
+    let mut adcs = Adcs::new(adc, p.PA0, p.PA1, p.PA2);
+
+    let foc = foc::FOC::new(
+        MotorParams {
+            pole_num: 7,
+            resistance: None,
+            inductance: None,
+        },
+        LoopMode::OpenVelocity {
+            voltage: 0.2,
+            expect_velocity: 90_f32.to_radians(),
+        },
+        Some(CurrentSensor::new(0.11, &mut adcs, &mut block_delay)),
+        1. / 20_000.,
+        1. / 8_000.,
+        1. / 1_000.,
+    );
+    static FOC: FocMutex = Mutex::new(None);
+    block_on(async {
+        *FOC.lock().await = Some(foc);
+    });
+
+    // *FOC.lock() = Some(foc);
+
+    ////////////////////////////////////////////////////////////
+    info!("Init PWM Interrupt...");
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
-    let spawner = EXECUTOR_CURRENT_LOOP.start(interrupt::TIM1_UP_TIM16);
-    spawner.spawn(task::current_loop(pwm, adc)).unwrap();
+    let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
+    spawner.spawn(task::current_loop(&FOC, pwms, adcs)).unwrap();
+    spawner.spawn(task::velocity_loop(&FOC)).unwrap();
+    spawner.spawn(task::position_loop(&FOC)).unwrap();
 
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
         spawner.spawn(task::usb_comm(usb, usb_class)).unwrap();
         spawner.spawn(task::can_comm(can)).unwrap();
-    })
+    });
 }
 
 #[interrupt]
 unsafe fn TIM1_UP_TIM16() {
-    EXECUTOR_CURRENT_LOOP.on_interrupt()
+    EXECUTOR_FOC_LOOP.on_interrupt()
 }

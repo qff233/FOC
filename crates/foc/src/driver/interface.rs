@@ -1,5 +1,5 @@
 pub trait Adcs {
-    fn get_voltage(&self) -> (f32, f32, f32);
+    fn get_voltage(&mut self) -> (f32, f32, f32);
 }
 
 pub trait Pwms {

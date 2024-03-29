@@ -39,23 +39,9 @@ defmt-rtt = "0.4"
 
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.0"
-embedded-hal = "1.0"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 heapless = { version = "0.8", default-features = false }
 
 static_cell = "2.0"
-lazy_static = { version = "1.0", features = ["spin_no_std"] }
-
-pid = "4.0"
 
 foc = {path = "../foc"}
-
-[profile.dev]
-debug = true
-lto = true
-opt-level = "s"
-
-[profile.release]
-lto = true
-debug = true
-opt-level = "s"

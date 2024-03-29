@@ -4,3 +4,13 @@ members = [
     "crates/foc"
 ]
 resolver = "2"
+
+[profile.dev]
+debug = true
+lto = true
+opt-level = "s"
+
+[profile.release]
+lto = true
+debug = true
+opt-level = "s"
