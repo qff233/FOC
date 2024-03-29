@@ -107,12 +107,12 @@ impl FOC {
         angle_sensor: &impl AngleSensor,
         voltage_adc: &mut impl Adcs,
     ) -> Result<(), Error> {
-        let sensor = current_sensor.as_ref().ok_or(Error::MisCurrentSensor)?;
+        let current_sensor = current_sensor.as_ref().ok_or(Error::MisCurrentSensor)?;
 
         let last_position = *current_position;
         *current_position = angle_sensor.get_angle() * pole_num as f32;
         *current_velocity = (*current_position - last_position) / current_loop_dt;
-        let (a, b, c) = sensor.get_currnet(voltage_adc);
+        let (a, b, c) = current_sensor.get_currnet(voltage_adc);
         *current_i = park(a, b, c, *current_position);
         Ok(())
     }
@@ -195,7 +195,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn velocity_tick(&mut self) -> Result<(), Error> {
+    pub fn velocity_tick(&mut self) -> Result<(), Error> {
         match &mut self.loop_mode {
             LoopMode::OpenVelocity {
                 voltage: _,
@@ -232,7 +232,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn position_tick(&mut self) -> Result<(), Error> {
+    pub fn position_tick(&mut self) -> Result<(), Error> {
         match &mut self.loop_mode {
             LoopMode::PositionWithSensor {
                 current_pid: _,
@@ -250,7 +250,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn set_expect_current(&mut self, current: f32) -> Result<(), Error> {
+    pub fn set_expect_current(&mut self, current: f32) -> Result<(), Error> {
         match &mut self.loop_mode {
             LoopMode::TorqueWithSensor {
                 current_pid: _,
@@ -264,7 +264,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn set_expect_velocity(&mut self, velocity: f32) -> Result<(), Error> {
+    pub fn set_expect_velocity(&mut self, velocity: f32) -> Result<(), Error> {
         match &mut self.loop_mode {
             LoopMode::OpenVelocity {
                 voltage: _,
@@ -287,7 +287,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn set_expect_position(&mut self, position: f32) -> Result<(), Error> {
+    pub fn set_expect_position(&mut self, position: f32) -> Result<(), Error> {
         match &mut self.loop_mode {
             LoopMode::PositionWithSensor {
                 current_pid: _,
@@ -303,7 +303,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    fn set_loop_mode(&mut self, loop_mode: LoopMode) {
+    pub fn set_loop_mode(&mut self, loop_mode: LoopMode) {
         self.loop_mode = loop_mode;
     }
 }

@@ -4,25 +4,50 @@ use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::timer::Channel;
 use foc::driver::interface;
 
-pub struct Adcs<A, B, C>
+pub struct VbusAdc<T, A>
 where
-    A: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    B: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    C: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
+    T: embassy_stm32::adc::Instance,
+    A: AdcPin<T> + embassy_stm32::gpio::Pin,
 {
-    adc: Adc<'static, peripherals::ADC1>,
+    adc: Adc<'static, T>,
+    pin: A,
+}
+
+impl<T, A> VbusAdc<T, A>
+where
+    T: embassy_stm32::adc::Instance,
+    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+{
+    pub fn new(adc: Adc<'static, T>, pin: A) -> Self {
+        Self { adc, pin }
+    }
+
+    pub fn get_voltage(&mut self) -> f32 {
+        self.adc.read(&mut self.pin) as f32 / 4096.
+    }
+}
+
+pub struct Adcs<T, A, B, C>
+where
+    T: embassy_stm32::adc::Instance,
+    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+    B: AdcPin<T> + embassy_stm32::gpio::Pin,
+    C: AdcPin<T> + embassy_stm32::gpio::Pin,
+{
+    adc: Adc<'static, T>,
     pin0: A,
     pin1: B,
     pin2: C,
 }
 
-impl<A, B, C> Adcs<A, B, C>
+impl<T, A, B, C> Adcs<T, A, B, C>
 where
-    A: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    B: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    C: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
+    T: embassy_stm32::adc::Instance,
+    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+    B: AdcPin<T> + embassy_stm32::gpio::Pin,
+    C: AdcPin<T> + embassy_stm32::gpio::Pin,
 {
-    pub fn new(adc: Adc<'static, peripherals::ADC1>, pin0: A, pin1: B, pin2: C) -> Self {
+    pub fn new(adc: Adc<'static, T>, pin0: A, pin1: B, pin2: C) -> Self {
         Self {
             adc,
             pin0,
@@ -32,11 +57,12 @@ where
     }
 }
 
-impl<A, B, C> interface::Adcs for Adcs<A, B, C>
+impl<T, A, B, C> interface::Adcs for Adcs<T, A, B, C>
 where
-    A: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    B: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
-    C: AdcPin<peripherals::ADC1> + embassy_stm32::gpio::Pin,
+    T: embassy_stm32::adc::Instance,
+    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+    B: AdcPin<T> + embassy_stm32::gpio::Pin,
+    C: AdcPin<T> + embassy_stm32::gpio::Pin,
 {
     fn get_voltage(&mut self) -> (f32, f32, f32) {
         let a = self.adc.read(&mut self.pin0) as f32 / 4096.;

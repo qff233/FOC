@@ -23,7 +23,7 @@ use foc::current_sensor::CurrentSensor;
 use foc::{LoopMode, MotorParams};
 use static_cell::StaticCell;
 
-use crate::interface::{Adcs, Pwms};
+use crate::interface::{Adcs, Pwms, VbusAdc};
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -147,8 +147,14 @@ fn main() -> ! {
 
     ////////////////////////////////////////////////////////////
     info!("Init ADC Driver...");
-    let adc = {
+    let adc1 = {
         let mut adc = Adc::new(p.ADC1, &mut Delay);
+        adc.set_sample_time(SampleTime::CYCLES2_5);
+        adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
+        adc
+    };
+    let adc2 = {
+        let mut adc = Adc::new(p.ADC2, &mut Delay);
         adc.set_sample_time(SampleTime::CYCLES2_5);
         adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
         adc
@@ -156,9 +162,9 @@ fn main() -> ! {
 
     ////////////////////////////////////////////////////////////
     info!("Init FOC...");
-    let mut block_delay = embassy_time::Delay;
     let pwms = Pwms::new(pwm);
-    let mut adcs = Adcs::new(adc, p.PA0, p.PA1, p.PA2);
+    let vbus_adc = VbusAdc::new(adc2, p.PC5);
+    let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
     let foc = foc::FOC::new(
         MotorParams {
@@ -170,7 +176,7 @@ fn main() -> ! {
             voltage: 0.2,
             expect_velocity: 90_f32.to_radians(),
         },
-        Some(CurrentSensor::new(0.11, &mut adcs, &mut block_delay)),
+        Some(CurrentSensor::new(0.11, &mut uvw_adcs, &mut Delay)),
         1. / 20_000.,
         1. / 8_000.,
         1. / 1_000.,
@@ -186,7 +192,9 @@ fn main() -> ! {
     info!("Init PWM Interrupt...");
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
-    spawner.spawn(task::current_loop(&FOC, pwms, adcs)).unwrap();
+    spawner
+        .spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms))
+        .unwrap();
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();
     spawner.spawn(task::position_loop(&FOC)).unwrap();
 
