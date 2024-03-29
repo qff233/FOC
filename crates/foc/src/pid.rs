@@ -48,7 +48,7 @@ impl PID {
         let output = p_term + i_term + d_term;
 
         if self.output_ramp > 0. {
-            let output_rate = (output - self.last_error) / dt;
+            let _output_rate = (output - self.last_error) / dt;
 
         }
         self.last_integral = i_term;
