@@ -9,8 +9,11 @@ pub mod current_sensor;
 pub mod driver;
 
 use angle_sensor::{AngleSensor, SensorType};
+use core::f32::consts::PI;
 use current_sensor::CurrentSensor;
+use defmt::info;
 use driver::interface::{Adcs, Pwms};
+use micromath::F32Ext;
 use pid::PID;
 use utils::{inv_park, park, svpwm};
 
@@ -132,7 +135,7 @@ impl FOC {
     #[allow(dead_code)]
     pub fn current_tick(
         &mut self,
-        bus_voltage: f32,
+        _bus_voltage: f32,
         angle_sensor: &mut impl AngleSensor,
         voltage_adc: &mut impl Adcs,
         pwm: &mut impl Pwms,
@@ -199,7 +202,7 @@ impl FOC {
             LoopMode::Velocity {} => (0., 0., 0.),
         };
 
-        let (a, b, c) = inv_park(ud * bus_voltage, uq * bus_voltage, angle);
+        let (a, b, c) = inv_park(ud * 3_f32.sqrt() / 2., uq * 3_f32.sqrt() / 2., angle);
         let (a, b, c) = svpwm(a, b, c);
         pwm.set_duty(a, b, c);
 
@@ -213,7 +216,11 @@ impl FOC {
                 voltage: _,
                 expect_velocity,
             } => {
-                self.current_position += *expect_velocity * self.velocity_loop_dt;
+                self.current_position +=
+                    *expect_velocity * self.velocity_loop_dt * self.motor_params.pole_num as f32;
+                if self.current_position.abs() >= PI {
+                    self.current_position = if *expect_velocity > 0. { -PI } else { PI };
+                }
             }
             LoopMode::VelocityWithSensor {
                 current_pid: _,

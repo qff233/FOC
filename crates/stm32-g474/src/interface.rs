@@ -1,3 +1,4 @@
+use defmt::info;
 use embassy_stm32::adc::{Adc, AdcPin};
 use embassy_stm32::peripherals;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
@@ -23,7 +24,7 @@ where
     }
 
     pub fn get_voltage(&mut self) -> f32 {
-        self.adc.read(&mut self.pin) as f32 / 4096.
+        self.adc.read(&mut self.pin) as f32 * 3.3 / 4096. * 16.0
     }
 }
 

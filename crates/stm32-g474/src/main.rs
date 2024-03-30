@@ -150,20 +150,21 @@ fn main() -> ! {
     let adc1 = {
         let mut adc = Adc::new(p.ADC1, &mut Delay);
         adc.set_sample_time(SampleTime::CYCLES2_5);
-        adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
+        adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
         adc
     };
     let adc2 = {
         let mut adc = Adc::new(p.ADC2, &mut Delay);
         adc.set_sample_time(SampleTime::CYCLES2_5);
-        adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
+        adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
         adc
     };
 
     ////////////////////////////////////////////////////////////
     info!("Init FOC...");
-    let pwms = Pwms::new(pwm);
+    let mut pwms = Pwms::new(pwm);
     let vbus_adc = VbusAdc::new(adc2, p.PC5);
+
     let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
     let foc = foc::FOC::new(
@@ -173,10 +174,15 @@ fn main() -> ! {
             inductance: None,
         },
         LoopMode::OpenVelocity {
-            voltage: 0.2,
-            expect_velocity: 90_f32.to_radians(),
+            voltage: 0.1,
+            expect_velocity: 180f32.to_radians(),
         },
-        Some(CurrentSensor::new(0.11, &mut uvw_adcs, &mut Delay)),
+        Some(CurrentSensor::new(
+            0.2,
+            &mut pwms,
+            &mut uvw_adcs,
+            &mut Delay,
+        )),
         1. / 20_000.,
         1. / 8_000.,
         1. / 1_000.,
@@ -192,15 +198,17 @@ fn main() -> ! {
     info!("Init PWM Interrupt...");
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
-    unwrap!(spawner.spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms)));
+    spawner
+        .spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms))
+        .unwrap();
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();
-    spawner.spawn(task::position_loop(&FOC)).unwrap();
+    // spawner.spawn(task::position_loop(&FOC)).unwrap();
 
     info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
-        unwrap!(spawner.spawn(task::usb_comm(usb, usb_class)));
-        unwrap!(spawner.spawn(task::can_comm(can)));
+        spawner.spawn(task::usb_comm(usb, usb_class)).unwrap();
+        spawner.spawn(task::can_comm(can)).unwrap();
     });
 }
 

@@ -1,6 +1,6 @@
 use embedded_hal::delay;
 
-use crate::driver::interface::Adcs;
+use crate::driver::interface::{Adcs, Pwms};
 
 #[allow(dead_code)]
 pub struct CurrentSensor {
@@ -10,7 +10,13 @@ pub struct CurrentSensor {
 
 impl CurrentSensor {
     #[allow(dead_code)]
-    pub fn new(sampling_resistor: f32, adc: &mut impl Adcs, delay: &mut impl delay::DelayNs) -> Self {
+    pub fn new(
+        sampling_resistor: f32,
+        pwms: &mut impl Pwms,
+        adc: &mut impl Adcs,
+        delay: &mut impl delay::DelayNs,
+    ) -> Self {
+        pwms.disable();
         let voltage_offset = {
             let (mut uc, mut vc, mut wc) = (0., 0., 0.);
             for _ in 0..500 {
@@ -22,6 +28,7 @@ impl CurrentSensor {
             }
             (uc / 500., vc / 500., wc / 500.)
         };
+        pwms.enable();
         Self {
             sampling_resistor,
             voltage_offset,

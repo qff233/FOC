@@ -1,4 +1,4 @@
-use defmt::info;
+use defmt::{info, warn};
 use embassy_stm32::peripherals;
 use embassy_time::Timer;
 use foc::{angle_sensor::NoAngleSensor, CurrentLoopError, PositionLoopError, VelocityLoopError};
@@ -8,6 +8,7 @@ use crate::{
     FocMutex,
 };
 
+// #[embassy_executor::task]
 // pub async fn foc_loop(
 //     foc: &'static FocMutex,
 //     mut vbus_adc: VbusAdc<peripherals::ADC2, peripherals::PC5>,
@@ -15,10 +16,15 @@ use crate::{
 //     mut pwm: Pwms,
 // ) {
 //     loop {
-
-//         info!("current_loop");
+//         // info!("current_loop");
+//         // current_loop(foc, &mut vbus_adc, &mut uvw_adcs, &mut pwm).await;
+//         // info!("velocity_loop");
+//         // velocity_loop(foc).await;
+//         // info!("position_loop");
+//         // position_loop(foc).await;
 //         // Timer::after_micros(244444).await
-//         Timer::after_ticks(22222).await;
+//         join3(current_loop(foc, &mut vbus_adc, &mut uvw_adcs, &mut pwm), velocity_loop(foc), position_loop(foc)).await;
+//         // Timer::after_micros(50).await;
 //     }
 // }
 
@@ -33,17 +39,23 @@ pub async fn current_loop(
 
     let mut angle_sensor = NoAngleSensor::new();
     loop {
-        let mut foc = foc.lock().await;
-        let foc = foc.as_mut().unwrap();
-        let bus_voltage = vbus_adc.get_voltage();
-        if let Err(e) = foc.current_tick(bus_voltage, &mut angle_sensor, &mut uvw_adcs, &mut pwm) {
-            match e {
-                CurrentLoopError::MisAngleSensor => {}
-                CurrentLoopError::MisCurrentSensor => {}
+        {
+            let mut foc = foc.lock().await;
+            let foc = foc.as_mut().unwrap();
+            let bus_voltage = vbus_adc.get_voltage();
+            // info!("{}", bus_voltage);
+
+            if let Err(e) =
+                foc.current_tick(bus_voltage, &mut angle_sensor, &mut uvw_adcs, &mut pwm)
+            {
+                match e {
+                    CurrentLoopError::MisAngleSensor => {}
+                    CurrentLoopError::MisCurrentSensor => {}
+                }
             }
         }
         // info!("current_loop");
-        Timer::after_micros(20000).await
+        Timer::after_micros(50).await
     }
 }
 
@@ -56,13 +68,13 @@ pub async fn velocity_loop(foc: &'static FocMutex) {
             if let Err(e) = foc.velocity_tick() {
                 match e {
                     VelocityLoopError::NoRequireVelocityLoop => {
-                        info!("Current loop mode do not requre velocity loop")
+                        warn!("Current loop mode do not requre velocity loop")
                     }
                 }
             };
         }
 
-        info!("velocity_loop");
+        // info!("velocity_loop");
         Timer::after_micros(125).await
     }
 }
@@ -76,13 +88,13 @@ pub async fn position_loop(foc: &'static FocMutex) {
             if let Err(e) = foc.position_tick() {
                 match e {
                     PositionLoopError::NoRequirePositionLoop => {
-                        info!("Current loop mode do not requre position loop")
+                        warn!("Current loop mode do not requre position loop")
                     }
                 }
             }
         }
 
-        info!("position_loop");
+        // info!("position_loop");
         Timer::after_micros(1000).await
     }
 }

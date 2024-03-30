@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
-    "time-driver-any",
+    "time-driver-tim3",
     "stm32g474re",
     "memory-x",
     "unstable-pac",
@@ -29,6 +29,18 @@ embassy-time = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt-timestamp-uptime",
 ] }
 embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
+# embassy-executor = { version = "0.5", features = [
+#     "arch-cortex-m",
+#     "executor-thread",
+#     "executor-interrupt",
+#     "defmt",
+#     "integrated-timers",
+# ] }
+# embassy-time = { version = "0.3", features = [
+#     "defmt",
+#     "defmt-timestamp-uptime",
+# ] }
+# embassy-time-driver = "0.1.0"
 embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
 ] }
@@ -44,4 +56,4 @@ heapless = { version = "0.8", default-features = false }
 
 static_cell = "2.0"
 
-foc = {path = "../foc"}
+foc = { path = "../foc" }
