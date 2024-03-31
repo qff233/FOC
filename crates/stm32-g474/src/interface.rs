@@ -1,4 +1,3 @@
-use defmt::info;
 use embassy_stm32::adc::{Adc, AdcPin};
 use embassy_stm32::peripherals;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;

@@ -1,6 +1,5 @@
 use core::f32::consts::PI;
 
-use defmt::info;
 use micromath::F32Ext;
 
 pub fn park(a: f32, b: f32, c: f32, mut angle: f32) -> (f32, f32) {

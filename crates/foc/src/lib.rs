@@ -11,7 +11,6 @@ pub mod driver;
 use angle_sensor::{AngleSensor, SensorType};
 use core::f32::consts::PI;
 use current_sensor::CurrentSensor;
-use defmt::info;
 use driver::interface::{Adcs, Pwms};
 use micromath::F32Ext;
 use pid::PID;
