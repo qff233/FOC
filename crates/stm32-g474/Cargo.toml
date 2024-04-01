@@ -3,8 +3,6 @@ name = "stm32-g474"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
@@ -29,18 +27,6 @@ embassy-time = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt-timestamp-uptime",
 ] }
 embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
-# embassy-executor = { version = "0.5", features = [
-#     "arch-cortex-m",
-#     "executor-thread",
-#     "executor-interrupt",
-#     "defmt",
-#     "integrated-timers",
-# ] }
-# embassy-time = { version = "0.3", features = [
-#     "defmt",
-#     "defmt-timestamp-uptime",
-# ] }
-# embassy-time-driver = "0.1.0"
 embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
 ] }

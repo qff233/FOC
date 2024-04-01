@@ -164,7 +164,6 @@ fn main() -> ! {
     info!("Init FOC...");
     let mut pwms = Pwms::new(pwm);
     let vbus_adc = VbusAdc::new(adc2, p.PC5);
-
     let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
     let foc = foc::FOC::new(
@@ -172,16 +171,17 @@ fn main() -> ! {
             pole_num: 7,
             resistance: None,
             inductance: None,
+            encoder_offset: None,
         },
         LoopMode::OpenVelocity {
-            voltage: 0.1,
+            voltage: 0.15,
             expect_velocity: 180f32.to_radians(),
         },
         Some(CurrentSensor::new(
             0.2,
             &mut pwms,
-            &mut uvw_adcs,
             &mut Delay,
+            &mut uvw_adcs,
         )),
         1. / 20_000.,
         1. / 8_000.,
@@ -207,8 +207,8 @@ fn main() -> ! {
     info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
-        spawner.spawn(task::usb_comm(usb, usb_class)).unwrap();
-        spawner.spawn(task::can_comm(can)).unwrap();
+        spawner.spawn(task::usb_comm(usb, usb_class, &FOC)).unwrap();
+        spawner.spawn(task::can_comm(can, &FOC)).unwrap();
     });
 }
 

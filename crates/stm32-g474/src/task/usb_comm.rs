@@ -17,6 +17,8 @@ use embassy_stm32::{peripherals, usb::Driver};
 use embassy_usb::{class::cdc_acm::CdcAcmClass, driver::EndpointError, UsbDevice};
 use heapless::Vec;
 
+use crate::FocMutex;
+
 enum State {
     Reply,
     LoopSend,
@@ -73,6 +75,7 @@ async fn process_usb_connnect(mut class: CdcAcmClass<'static, Driver<'static, pe
 pub async fn usb_comm(
     mut usb: UsbDevice<'static, Driver<'static, peripherals::USB>>,
     class: CdcAcmClass<'static, Driver<'static, peripherals::USB>>,
+    _foc: &'static FocMutex,
 ) {
     join(usb.run(), process_usb_connnect(class)).await;
 }

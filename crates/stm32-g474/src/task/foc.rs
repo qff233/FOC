@@ -1,32 +1,12 @@
 use defmt::warn;
 use embassy_stm32::peripherals;
 use embassy_time::Timer;
-use foc::{angle_sensor::NoAngleSensor, CurrentLoopError, PositionLoopError, VelocityLoopError};
+use foc::{CurrentLoopError, PositionLoopError, VelocityLoopError};
 
 use crate::{
     interface::{Adcs, Pwms, VbusAdc},
     FocMutex,
 };
-
-// #[embassy_executor::task]
-// pub async fn foc_loop(
-//     foc: &'static FocMutex,
-//     mut vbus_adc: VbusAdc<peripherals::ADC2, peripherals::PC5>,
-//     mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
-//     mut pwm: Pwms,
-// ) {
-//     loop {
-//         // info!("current_loop");
-//         // current_loop(foc, &mut vbus_adc, &mut uvw_adcs, &mut pwm).await;
-//         // info!("velocity_loop");
-//         // velocity_loop(foc).await;
-//         // info!("position_loop");
-//         // position_loop(foc).await;
-//         // Timer::after_micros(244444).await
-//         join3(current_loop(foc, &mut vbus_adc, &mut uvw_adcs, &mut pwm), velocity_loop(foc), position_loop(foc)).await;
-//         // Timer::after_micros(50).await;
-//     }
-// }
 
 #[embassy_executor::task]
 pub async fn current_loop(
@@ -35,9 +15,6 @@ pub async fn current_loop(
     mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
     mut pwm: Pwms,
 ) {
-    // _adc: Adcs<peripherals.PA0, peripherals.PA1, peripherals.PA2>) {
-
-    let mut angle_sensor = NoAngleSensor::new();
     loop {
         {
             let mut foc = foc.lock().await;
@@ -45,12 +22,11 @@ pub async fn current_loop(
             let bus_voltage = vbus_adc.get_voltage();
             // info!("{}", bus_voltage);
 
-            if let Err(e) =
-                foc.current_tick(bus_voltage, &mut angle_sensor, &mut uvw_adcs, &mut pwm)
-            {
+            if let Err(e) = foc.current_tick(bus_voltage, None, Some(&mut uvw_adcs), &mut pwm) {
                 match e {
                     CurrentLoopError::MisAngleSensor => {}
                     CurrentLoopError::MisCurrentSensor => {}
+                    CurrentLoopError::MisCurrentAdcs => {}
                 }
             }
         }
