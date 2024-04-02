@@ -11,10 +11,11 @@ use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::CountingMode;
 use embassy_stm32::timer::simple_pwm::PwmPin;
-use embassy_stm32::{bind_interrupts, Config};
+use embassy_stm32::{bind_interrupts, gpio, timer, Config};
 use embassy_stm32::{can, usb};
 use embassy_stm32::{interrupt, peripherals};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex};
+use embassy_sync::channel::Channel;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Delay;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
@@ -39,7 +40,12 @@ bind_interrupts!(struct Irqs {
 static EXECUTOR_FOC_LOOP: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 
+enum SharedEvent {
+    UvwI(f32, f32, f32),
+}
+
 type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::FOC>>;
+static SHAREDCHANNEL: Channel<CriticalSectionRawMutex, SharedEvent, 64> = Channel::new();
 
 #[entry]
 fn main() -> ! {
@@ -124,12 +130,11 @@ fn main() -> ! {
     info!("Init PWM Driver...");
     let pwm = {
         let u_h = PwmPin::new_ch1(p.PA8, embassy_stm32::gpio::OutputType::PushPull);
-        let u_l = ComplementaryPwmPin::new_ch1(p.PB13, embassy_stm32::gpio::OutputType::PushPull);
+        let u_l = ComplementaryPwmPin::new_ch1(p.PB13, gpio::OutputType::PushPull);
         let v_h = PwmPin::new_ch2(p.PA9, embassy_stm32::gpio::OutputType::PushPull);
-        let v_l = ComplementaryPwmPin::new_ch2(p.PB14, embassy_stm32::gpio::OutputType::PushPull);
+        let v_l = ComplementaryPwmPin::new_ch2(p.PB14, gpio::OutputType::PushPull);
         let w_h = PwmPin::new_ch3(p.PA10, embassy_stm32::gpio::OutputType::PushPull);
-        let w_l = ComplementaryPwmPin::new_ch3(p.PB15, embassy_stm32::gpio::OutputType::PushPull);
-        // let u_h = PwmPin::new_ch1(p.PA8, embassy_stm32::gpio::OutputType::PushPull);
+        let w_l = ComplementaryPwmPin::new_ch3(p.PB15, gpio::OutputType::PushPull);
         ComplementaryPwm::new(
             p.TIM1,
             Some(u_h),
@@ -144,6 +149,7 @@ fn main() -> ! {
             CountingMode::CenterAlignedUpInterrupts,
         )
     };
+    // pwm.set_duty(timer::Channel::Ch4, 10); // This is set for ADC toggle
 
     ////////////////////////////////////////////////////////////
     info!("Init ADC Driver...");
@@ -173,12 +179,16 @@ fn main() -> ! {
             inductance: None,
             encoder_offset: None,
         },
-        LoopMode::OpenVelocity {
-            voltage: 0.15,
-            expect_velocity: 180f32.to_radians(),
+        // LoopMode::OpenVelocity {
+        //     voltage: 0.15,
+        //     expect_velocity: 90f32.to_radians(),
+        // },
+        LoopMode::TorqueWithSensor {
+            current_pid: foc::PID::new(1.0, 0.0, 0.0, 0.000_5, 0.0, 1.0, 1.0),
+            expect_current: 0.1,
         },
         Some(CurrentSensor::new(
-            0.2,
+            0.005,
             &mut pwms,
             &mut Delay,
             &mut uvw_adcs,
@@ -192,27 +202,35 @@ fn main() -> ! {
         *FOC.lock().await = Some(foc);
     });
 
-    // *FOC.lock() = Some(foc);
-
     ////////////////////////////////////////////////////////////
     info!("Init PWM Interrupt...");
     interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
     spawner
-        .spawn(task::current_loop(&FOC, vbus_adc, uvw_adcs, pwms))
+        .spawn(task::current_loop(
+            &FOC,
+            SHAREDCHANNEL.sender(),
+            vbus_adc,
+            uvw_adcs,
+            pwms,
+        ))
         .unwrap();
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();
-    // spawner.spawn(task::position_loop(&FOC)).unwrap();
+    spawner.spawn(task::position_loop(&FOC)).unwrap();
 
     info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
-        spawner.spawn(task::usb_comm(usb, usb_class, &FOC)).unwrap();
-        spawner.spawn(task::can_comm(can, &FOC)).unwrap();
+        spawner
+            .spawn(task::usb_comm(usb, usb_class, SHAREDCHANNEL.receiver()))
+            .unwrap();
+        spawner
+            .spawn(task::can_comm(can, SHAREDCHANNEL.receiver()))
+            .unwrap();
     });
 }
 
 #[interrupt]
 unsafe fn TIM1_UP_TIM16() {
-    EXECUTOR_FOC_LOOP.on_interrupt()
+    EXECUTOR_FOC_LOOP.on_interrupt();
 }

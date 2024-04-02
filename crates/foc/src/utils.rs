@@ -3,7 +3,6 @@ use core::f32::consts::PI;
 use micromath::F32Ext;
 
 pub fn park(a: f32, b: f32, c: f32, mut angle: f32) -> (f32, f32) {
-    angle += PI;
     angle = angle.min(2. * PI).max(0.);
 
     let theta = angle - 120_f32.to_radians(); // angle - 120
@@ -22,7 +21,6 @@ pub fn park(a: f32, b: f32, c: f32, mut angle: f32) -> (f32, f32) {
 }
 
 pub fn inv_park(d: f32, q: f32, mut angle: f32) -> (f32, f32, f32) {
-    angle += PI;
     angle = angle.min(2. * PI).max(0.);
     // trace!("{}", angle);
     let theta = angle - 120_f32.to_radians(); // angle - 120

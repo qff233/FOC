@@ -1,3 +1,4 @@
+use defmt::debug;
 use embedded_hal::delay;
 
 use crate::driver::interface::{Adcs, Pwms};
@@ -36,12 +37,20 @@ impl CurrentSensor {
     }
 
     #[allow(dead_code)]
-    pub fn get_currnet(&mut self, uvw_adcs: &mut dyn Adcs) -> (f32, f32, f32) {
+    pub fn get_currnet(&mut self, bus_voltage: f32, uvw_adcs: &mut dyn Adcs) -> (f32, f32, f32) {
         let (u, v, w) = uvw_adcs.get_voltage();
         let (u_offset, v_offset, w_offset) = self.voltage_offset;
-        let u_current = (u - u_offset) / self.sampling_resistor;
-        let v_current = (v - v_offset) / self.sampling_resistor;
-        let w_current = (w - w_offset) / self.sampling_resistor;
+        // debug!(
+        //     "{},{},{}",
+        //     (u - u_offset) * bus_voltage,
+        //     (v - v_offset) * bus_voltage,
+        //     (w - w_offset) * bus_voltage
+        // );
+
+        let u_current = (u - u_offset) * bus_voltage / self.sampling_resistor;
+        let v_current = (v - v_offset) * bus_voltage / self.sampling_resistor;
+        let w_current = (w - w_offset) * bus_voltage / self.sampling_resistor;
+        // debug!("{},{},{}", u_current, v_current, w_current);
         (u_current, v_current, w_current)
     }
 

@@ -14,7 +14,7 @@ pub struct PID {
 
 impl PID {
     #[allow(dead_code)]
-    fn new(
+    pub fn new(
         p: f32,
         i: f32,
         d: f32,
