@@ -1,4 +1,3 @@
-use defmt::{debug, info};
 use embassy_stm32::peripherals;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::Timer;
@@ -14,10 +13,11 @@ pub async fn current_loop(
     foc: &'static FocMutex,
     comm_sender: Sender<'static, CriticalSectionRawMutex, SharedEvent, 64>,
     mut vbus_adc: VbusAdc<peripherals::ADC2, peripherals::PC5>,
-    mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
+    // mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
+    mut uvw_adcs: Adcs,
     mut pwm: Pwms<peripherals::TIM1>,
 ) {
-    let mut angle_sensor = TestAngleSensor::new(15_f32.to_radians(), 0.00005);
+    let mut angle_sensor = TestAngleSensor::new(180_f32.to_radians(), 0.00005);
     let mut send_to_usb_data: (f32, f32, f32);
 
     loop {
@@ -45,12 +45,12 @@ pub async fn current_loop(
         //debug!("out: {}", embassy_time::Instant::now());
         let (u, v, w) = send_to_usb_data;
         comm_sender.try_send(SharedEvent::UvwI(u, v, w)).ok();
-        let begin = embassy_time::Instant::now();
-        let res = embassy_time::Instant::now() - begin;
-        let res = res.as_micros();
-        debug!("time: {}", res);
+        // let begin = embassy_time::Instant::now();
+        // let res = embassy_time::Instant::now() - begin;
+        // let res = res.as_micros();
+        // debug!("time: {}", res);
         // info!("{}", embassy_time::Instant::now());
-        Timer::after_micros(50).await
+        Timer::after_micros(5).await
     }
 }
 

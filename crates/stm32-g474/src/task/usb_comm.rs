@@ -1,10 +1,7 @@
 use defmt::info;
 use embassy_futures::join::join;
 use embassy_stm32::{peripherals, usb::Driver};
-use embassy_sync::{
-    blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex},
-    channel::Receiver,
-};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Receiver};
 use embassy_usb::{class::cdc_acm::CdcAcmClass, driver::EndpointError, UsbDevice};
 use heapless::Vec;
 
@@ -19,7 +16,12 @@ async fn process_usb_data(
     foc_receiver: Receiver<'static, CriticalSectionRawMutex, SharedEvent, 64>,
     _recv_data: &[u8],
 ) -> (Option<Vec<u8, 32>>, State) {
-    let data = match foc_receiver.receive().await {
+    let foc_receiver = foc_receiver.try_receive().ok();
+    if let None = foc_receiver {
+        return (None, State::LoopSend);
+    }
+
+    let data = match foc_receiver.unwrap() {
         SharedEvent::UvwI(u, v, w) => {
             let mut data: Vec<u8, 32> = Vec::new();
             data.extend_from_slice(&u.to_le_bytes()).unwrap();

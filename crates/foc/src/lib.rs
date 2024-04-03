@@ -117,7 +117,6 @@ impl FOC {
     fn update_i_velocity_position(
         pole_num: u32,
         current_loop_dt: f32,
-        bus_voltage: f32,
         angle_sensor: &mut Option<&mut dyn AngleSensor>,
         current_sensor_adcs: &mut (&mut Option<CurrentSensor>, &mut Option<&mut dyn Adcs>),
         current_raw_i: &mut (f32, f32, f32),
@@ -140,7 +139,7 @@ impl FOC {
         let last_position = *current_position;
         *current_position = angle_sensor.get_angle() * pole_num as f32 % 2. * PI;
         *current_velocity = (*current_position - last_position) / current_loop_dt;
-        let (a, b, c) = current_sensor.get_currnet(bus_voltage, *uvw_adcs);
+        let (a, b, c) = current_sensor.get_currnet(*uvw_adcs);
         *current_raw_i = (a, b, c);
         *current_i = park(a, b, c, *current_position);
         Ok(())
@@ -149,7 +148,7 @@ impl FOC {
     #[allow(dead_code)]
     pub fn current_tick(
         &mut self,
-        bus_voltage: f32,
+        _bus_voltage: f32,
         mut angle_sensor: Option<&mut dyn AngleSensor>,
         mut uvw_adcs: Option<&mut dyn Adcs>,
         pwm: &mut dyn Pwms,
@@ -162,13 +161,12 @@ impl FOC {
             } => (0., *voltage, self.current_position),
             LoopMode::Calibration => (0., 0., 0.),
             LoopMode::TorqueWithSensor {
-                current_pid,
-                expect_current,
+                current_pid: _,
+                expect_current: _,
             } => {
                 Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
-                    bus_voltage,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
                     &mut self.current_raw_i,
@@ -188,7 +186,6 @@ impl FOC {
                 Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
-                    bus_voltage,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
                     &mut self.current_raw_i,
@@ -208,7 +205,6 @@ impl FOC {
                 Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
-                    bus_voltage,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
                     &mut self.current_raw_i,

@@ -6,7 +6,6 @@ use defmt::*;
 use embassy_executor::{Executor, InterruptExecutor};
 use embassy_futures::block_on;
 use embassy_stm32::adc::{Adc, SampleTime};
-use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::CountingMode;
@@ -14,7 +13,7 @@ use embassy_stm32::timer::simple_pwm::PwmPin;
 use embassy_stm32::{bind_interrupts, gpio, timer, Config};
 use embassy_stm32::{can, usb};
 use embassy_stm32::{interrupt, peripherals};
-use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Delay;
@@ -128,7 +127,7 @@ fn main() -> ! {
     ////////////////////////////////////////////////////////////
     // Init PWM
     info!("Init PWM Driver...");
-    let pwm = {
+    let mut pwm = {
         let u_h = PwmPin::new_ch1(p.PA8, embassy_stm32::gpio::OutputType::PushPull);
         let u_l = ComplementaryPwmPin::new_ch1(p.PB13, gpio::OutputType::PushPull);
         let v_h = PwmPin::new_ch2(p.PA9, embassy_stm32::gpio::OutputType::PushPull);
@@ -149,28 +148,30 @@ fn main() -> ! {
             CountingMode::CenterAlignedUpInterrupts,
         )
     };
-    // pwm.set_duty(timer::Channel::Ch4, 10); // This is set for ADC toggle
+    pwm.set_duty(timer::Channel::Ch4, pwm.get_max_duty() - 500); // This is set for ADC toggle
+    pwm.enable(timer::Channel::Ch4);
 
     ////////////////////////////////////////////////////////////
     info!("Init ADC Driver...");
-    let adc1 = {
-        let mut adc = Adc::new(p.ADC1, &mut Delay);
-        adc.set_sample_time(SampleTime::CYCLES2_5);
-        adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
-        adc
-    };
+    // let adc1 = {
+    //     let mut adc = Adc::new(p.ADC1, &mut Delay);
+    //     adc.set_sample_time(SampleTime::CYCLES2_5);
+    //     adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
+    //     adc
+    // };
     let adc2 = {
         let mut adc = Adc::new(p.ADC2, &mut Delay);
         adc.set_sample_time(SampleTime::CYCLES2_5);
         adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
         adc
     };
+    let mut uvw_adcs = Adcs::new();
 
     ////////////////////////////////////////////////////////////
     info!("Init FOC...");
     let mut pwms = Pwms::new(pwm);
     let vbus_adc = VbusAdc::new(adc2, p.PC5);
-    let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
+    // let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
     let foc = foc::FOC::new(
         MotorParams {
@@ -189,6 +190,7 @@ fn main() -> ! {
         },
         Some(CurrentSensor::new(
             0.005,
+            16.0,
             &mut pwms,
             &mut Delay,
             &mut uvw_adcs,
@@ -204,8 +206,8 @@ fn main() -> ! {
 
     ////////////////////////////////////////////////////////////
     info!("Init PWM Interrupt...");
-    interrupt::TIM1_UP_TIM16.set_priority(Priority::P5);
-    let spawner = EXECUTOR_FOC_LOOP.start(interrupt::TIM1_UP_TIM16);
+
+    let spawner = EXECUTOR_FOC_LOOP.start(interrupt::ADC1_2);
     spawner
         .spawn(task::current_loop(
             &FOC,
@@ -231,6 +233,10 @@ fn main() -> ! {
 }
 
 #[interrupt]
-unsafe fn TIM1_UP_TIM16() {
-    EXECUTOR_FOC_LOOP.on_interrupt();
+unsafe fn ADC1_2() {
+    // debug!("{}", embassy_stm32::pac::ADC1.isr().read().0);
+    if embassy_stm32::pac::ADC1.isr().read().jeos() {
+        EXECUTOR_FOC_LOOP.on_interrupt();
+        embassy_stm32::pac::ADC1.isr().write(|w| w.set_jeos(true));
+    }
 }
