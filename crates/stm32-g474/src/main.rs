@@ -43,8 +43,20 @@ static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 enum SharedEvent {
     Iuvw(f32, f32, f32),
     Idq(f32, f32),
-    Position { current: f32, expect: f32 },
-    Velocity { current: f32, expect: f32 },
+    Position {
+        expect: f32,
+        current: f32,
+    },
+    Velocity {
+        expect: f32,
+        current: f32,
+    },
+    State {
+        i_uvw: (f32, f32, f32),
+        i_dq: (f32, f32),
+        position: (f32, f32),
+        velocity: (f32, f32),
+    },
 }
 
 type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::FOC>>;
@@ -152,7 +164,7 @@ fn main() -> ! {
             CountingMode::CenterAlignedUpInterrupts,
         )
     };
-    pwm.set_duty(timer::Channel::Ch4, pwm.get_max_duty() - 500); // This is set for ADC toggle
+    pwm.set_duty(timer::Channel::Ch4, pwm.get_max_duty() - 50); // This is set for ADC toggle
     pwm.enable(timer::Channel::Ch4);
 
     ////////////////////////////////////////////////////////////
@@ -190,7 +202,7 @@ fn main() -> ! {
         // },
         LoopMode::TorqueWithSensor {
             current_pid: foc::PID::new(1.0, 0.0, 0.0, 0.000_5, 0.0, 1.0, 1.0),
-            expect_current: 0.0,
+            expect_current: 0.15,
         },
         Some(CurrentSensor::new(
             0.005,

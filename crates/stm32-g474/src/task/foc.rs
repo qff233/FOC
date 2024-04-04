@@ -56,8 +56,15 @@ pub async fn current_loop(
             let (u, v, w) = foc.current_i_uvw;
             comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
 
-            // let (d, q) = foc.current_i;
+            // let (d, q) = foc.current_i_dq;
             // comm_sender.try_send(SharedEvent::Idq(d, q)).ok();
+
+            // comm_sender
+            //     .try_send(SharedEvent::Velocity {
+            //         expect: 0.0,
+            //         current: foc.get_velocity(),
+            //     })
+            //     .ok();
         }
         Timer::after_micros(5).await
     }

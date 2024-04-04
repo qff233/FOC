@@ -81,7 +81,7 @@ pub struct FOC {
     pub current_sensor: Option<CurrentSensor>,
 
     pub current_i_uvw: (f32, f32, f32), // u v w
-    pub current_i_dq: (f32, f32),          // id, iq
+    pub current_i_dq: (f32, f32),       // id, iq
     pub current_velocity: f32,
     pub current_position: f32,
 
@@ -106,7 +106,7 @@ impl FOC {
             loop_mode,
             current_sensor,
             current_i_uvw: (0., 0., 0.), // u v w
-            current_i_dq: (0., 0.),         // id iq
+            current_i_dq: (0., 0.),      // id iq
             current_velocity: 0.,
             current_position: 0.,
             current_loop_dt,
@@ -120,8 +120,8 @@ impl FOC {
         current_loop_dt: f32,
         angle_sensor: &mut Option<&mut impl AngleSensor>,
         current_sensor_adcs: &mut (&mut Option<CurrentSensor>, &mut Option<&mut dyn Adcs>),
-        current_raw_i: &mut (f32, f32, f32),
-        current_i: &mut (f32, f32),
+        current_i_uvw: &mut (f32, f32, f32),
+        current_i_dq: &mut (f32, f32),
         current_velocity: &mut f32,
         current_position: &mut f32,
     ) -> Result<AngleSinCos, CurrentLoopError> {
@@ -142,12 +142,23 @@ impl FOC {
             .get_angle()
             .map_err(|_| CurrentLoopError::NoAngleData)?;
         *current_position = angle * pole_num as f32 % (2. * PI);
-        *current_velocity = (*current_position - last_position) / current_loop_dt;
+
+        let mut delta_position = *current_position - last_position;
+        if delta_position.abs() > 2. * PI / 3. {
+            if delta_position > 0. {
+                // From negitive to positive deg.
+                delta_position = -(2. * PI - last_position.abs() + *current_position);
+            } else {
+                // From positive to negitive deg.
+                delta_position = 2. * PI - last_position + current_position.abs();
+            }
+        }
+        *current_velocity = delta_position / current_loop_dt;
         let (a, b, c) = current_sensor.get_currnet(*uvw_adcs);
-        *current_raw_i = (a, b, c);
+        *current_i_uvw = (a, b, c);
 
         let angle_sin_cos = AngleSinCos::new(*current_position);
-        *current_i = park(a, b, c, &angle_sin_cos);
+        *current_i_dq = park(a, b, c, &angle_sin_cos);
         Ok(angle_sin_cos)
     }
 
@@ -347,5 +358,15 @@ impl FOC {
             }
             _ => Err(SetError::NoRequireSetPosition),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_position(&self) -> f32 {
+        self.current_position / self.motor_params.pole_num as f32
+    }
+
+    #[allow(dead_code)]
+    pub fn get_velocity(&self) -> f32 {
+        self.current_velocity / self.motor_params.pole_num as f32
     }
 }

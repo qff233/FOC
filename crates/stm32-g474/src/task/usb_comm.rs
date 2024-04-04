@@ -32,13 +32,36 @@ async fn process_usb_data(
             data.extend_from_slice(&d.to_le_bytes()).unwrap();
             data.extend_from_slice(&q.to_le_bytes()).unwrap();
         }
-        SharedEvent::Velocity { current, expect } => {
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+        SharedEvent::Velocity { expect, current } => {
             data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
         }
-        SharedEvent::Position { current, expect } => {
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+        SharedEvent::Position { expect, current } => {
             data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+        }
+        SharedEvent::State {
+            i_uvw,
+            i_dq,
+            position,
+            velocity,
+        } => {
+            let (u, v, w) = i_uvw;
+            data.extend_from_slice(&u.to_le_bytes()).unwrap();
+            data.extend_from_slice(&v.to_le_bytes()).unwrap();
+            data.extend_from_slice(&w.to_le_bytes()).unwrap();
+
+            let (d, q) = i_dq;
+            data.extend_from_slice(&d.to_le_bytes()).unwrap();
+            data.extend_from_slice(&q.to_le_bytes()).unwrap();
+
+            let (expect, current) = velocity;
+            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+
+            let (expect, current) = position;
+            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
         }
     }
     data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();

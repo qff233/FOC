@@ -1,4 +1,5 @@
 mod mt6818;
+mod as5048;
 
 use core::f32::consts::PI;
 

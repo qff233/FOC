@@ -73,7 +73,7 @@ impl Adcs {
         ADC1.jsqr().modify(|w| {
             w.set_jextsel(1);
             w.set_jl(2);
-            w.set_jexten(vals::Jexten::RISINGEDGE); // 触发边缘
+            w.set_jexten(vals::Jexten::FALLINGEDGE); // 触发边缘
         });
 
         ADC1.cr().modify(|w| {

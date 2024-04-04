@@ -44,8 +44,8 @@ pub fn park(a: f32, b: f32, c: f32, cos_sin: &AngleSinCos) -> (f32, f32) {
     let b2 = -cos_sin.sin_beta;
     let b3 = -cos_sin.sin_gamma;
 
-    let d = 2.0_f32 / 3. * (a1 * a + a2 * b + a3 * c);
-    let q = 2.0_f32 / 3. * (b1 * a + b2 * b + b3 * c);
+    let d = 2.0 / 3. * (a1 * a + a2 * b + a3 * c);
+    let q = 2.0 / 3. * (b1 * a + b2 * b + b3 * c);
     (d, q)
 }
 
