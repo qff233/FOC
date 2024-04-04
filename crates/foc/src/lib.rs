@@ -15,7 +15,7 @@ use core::f32::consts::PI;
 use current_sensor::CurrentSensor;
 use driver::interface::{Adcs, Pwms};
 use micromath::F32Ext;
-use utils::{inv_park, park, svpwm};
+use utils::{inv_park, park, svpwm, AngleSinCos};
 
 pub enum SetError {
     NoRequireSetCurrent,
@@ -27,6 +27,7 @@ pub enum CurrentLoopError {
     MisCurrentSensor,
     MisCurrentAdcs,
     MisAngleSensor,
+    NoAngleData,
 }
 
 pub enum VelocityLoopError {
@@ -79,8 +80,8 @@ pub struct FOC {
     pub loop_mode: LoopMode,
     pub current_sensor: Option<CurrentSensor>,
 
-    pub current_raw_i: (f32, f32, f32), // u v w
-    pub current_i: (f32, f32),          // id, iq
+    pub current_i_uvw: (f32, f32, f32), // u v w
+    pub current_i_dq: (f32, f32),          // id, iq
     pub current_velocity: f32,
     pub current_position: f32,
 
@@ -104,8 +105,8 @@ impl FOC {
             motor_params,
             loop_mode,
             current_sensor,
-            current_raw_i: (0., 0., 0.), // u v w
-            current_i: (0., 0.),         // id iq
+            current_i_uvw: (0., 0., 0.), // u v w
+            current_i_dq: (0., 0.),         // id iq
             current_velocity: 0.,
             current_position: 0.,
             current_loop_dt,
@@ -117,13 +118,13 @@ impl FOC {
     fn update_i_velocity_position(
         pole_num: u32,
         current_loop_dt: f32,
-        angle_sensor: &mut Option<&mut dyn AngleSensor>,
+        angle_sensor: &mut Option<&mut impl AngleSensor>,
         current_sensor_adcs: &mut (&mut Option<CurrentSensor>, &mut Option<&mut dyn Adcs>),
         current_raw_i: &mut (f32, f32, f32),
         current_i: &mut (f32, f32),
         current_velocity: &mut f32,
         current_position: &mut f32,
-    ) -> Result<(), CurrentLoopError> {
+    ) -> Result<AngleSinCos, CurrentLoopError> {
         let current_sensor = current_sensor_adcs
             .0
             .as_mut()
@@ -137,64 +138,69 @@ impl FOC {
             .ok_or(CurrentLoopError::MisAngleSensor)?;
 
         let last_position = *current_position;
-        *current_position = angle_sensor.get_angle() * pole_num as f32 % 2. * PI;
+        let angle = angle_sensor
+            .get_angle()
+            .map_err(|_| CurrentLoopError::NoAngleData)?;
+        *current_position = angle * pole_num as f32 % (2. * PI);
         *current_velocity = (*current_position - last_position) / current_loop_dt;
         let (a, b, c) = current_sensor.get_currnet(*uvw_adcs);
         *current_raw_i = (a, b, c);
-        *current_i = park(a, b, c, *current_position);
-        Ok(())
+
+        let angle_sin_cos = AngleSinCos::new(*current_position);
+        *current_i = park(a, b, c, &angle_sin_cos);
+        Ok(angle_sin_cos)
     }
 
     #[allow(dead_code)]
     pub fn current_tick(
         &mut self,
         _bus_voltage: f32,
-        mut angle_sensor: Option<&mut dyn AngleSensor>,
+        mut angle_sensor: Option<&mut impl AngleSensor>,
         mut uvw_adcs: Option<&mut dyn Adcs>,
         pwm: &mut dyn Pwms,
     ) -> Result<(), CurrentLoopError> {
-        let (ud, uq, angle) = match &mut self.loop_mode {
-            LoopMode::None => (0., 0., 0.),
+        let (ud, uq, angle_sin_cos) = match &mut self.loop_mode {
+            LoopMode::None => (0., 0., AngleSinCos::new(0.)),
             LoopMode::OpenVelocity {
                 voltage,
                 expect_velocity: _,
-            } => (0., *voltage, self.current_position),
-            LoopMode::Calibration => (0., 0., 0.),
+            } => (0., *voltage, AngleSinCos::new(self.current_position)),
+            LoopMode::Calibration => (0., 0., AngleSinCos::new(0.)),
             LoopMode::TorqueWithSensor {
                 current_pid: _,
-                expect_current: _,
+                expect_current,
             } => {
-                Self::update_i_velocity_position(
+                let angle_sin_cos = Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
-                    &mut self.current_raw_i,
-                    &mut self.current_i,
+                    &mut self.current_i_uvw,
+                    &mut self.current_i_dq,
                     &mut self.current_velocity,
                     &mut self.current_position,
                 )?;
                 // let iq = current_pid.update(*expect_current - self.current_i.1);
                 // (0., iq, self.current_position)
-                (0., 0.15, self.current_position)
+                (0., *expect_current, angle_sin_cos)
             }
             LoopMode::VelocityWithSensor {
                 current_pid,
                 velocity_pid,
                 expect_velocity: _,
             } => {
-                Self::update_i_velocity_position(
+                let angle_sin_cos = Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
-                    &mut self.current_raw_i,
-                    &mut self.current_i,
+                    &mut self.current_i_uvw,
+                    &mut self.current_i_dq,
                     &mut self.current_velocity,
                     &mut self.current_position,
                 )?;
-                let iq = current_pid.update(velocity_pid.last_output - self.current_i.1);
-                (0., iq, self.current_position)
+                let iq = current_pid.update(velocity_pid.last_output - self.current_i_dq.1);
+                (0., iq, angle_sin_cos)
             }
             LoopMode::PositionWithSensor {
                 current_pid,
@@ -202,23 +208,27 @@ impl FOC {
                 position_pid: _,
                 expect_position: _,
             } => {
-                Self::update_i_velocity_position(
+                let angle_sin_cos = Self::update_i_velocity_position(
                     self.motor_params.pole_num,
                     self.current_loop_dt,
                     &mut angle_sensor,
                     &mut (&mut self.current_sensor, &mut uvw_adcs),
-                    &mut self.current_raw_i,
-                    &mut self.current_i,
+                    &mut self.current_i_uvw,
+                    &mut self.current_i_dq,
                     &mut self.current_velocity,
                     &mut self.current_position,
                 )?;
-                let iq = current_pid.update(velocity_pid.last_output - self.current_i.1);
-                (0., iq, self.current_position)
+                let iq = current_pid.update(velocity_pid.last_output - self.current_i_dq.1);
+                (0., iq, angle_sin_cos)
             }
-            LoopMode::Velocity {} => (0., 0., 0.),
+            LoopMode::Velocity {} => (0., 0., AngleSinCos::new(0.)),
         };
 
-        let (a, b, c) = inv_park(ud * 3_f32.sqrt() / 2., uq * 3_f32.sqrt() / 2., angle);
+        let (a, b, c) = inv_park(
+            ud * 3_f32.sqrt() / 2.,
+            uq * 3_f32.sqrt() / 2.,
+            &angle_sin_cos,
+        );
         let (a, b, c) = svpwm(a, b, c);
         pwm.set_duty(a, b, c);
 

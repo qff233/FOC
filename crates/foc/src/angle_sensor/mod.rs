@@ -1,7 +1,11 @@
+mod mt6818;
+
 use core::f32::consts::PI;
 
 pub trait AngleSensor {
-    fn get_angle(&mut self) -> f32;
+    type Error;
+    /// return [0, 2PI)
+    fn get_angle(&mut self) -> Result<f32, Self::Error>;
 }
 
 pub struct TestAngleSensor {
@@ -19,8 +23,11 @@ impl TestAngleSensor {
         }
     }
 }
+
 impl AngleSensor for TestAngleSensor {
-    fn get_angle(&mut self) -> f32 {
+    type Error = ();
+
+    fn get_angle(&mut self) -> Result<f32, Self::Error> {
         self.current_angle += self.angle_step * self.current_loop_dt;
         if self.current_angle > 2. * PI {
             self.current_angle -= 2. * PI
@@ -31,6 +38,6 @@ impl AngleSensor for TestAngleSensor {
         //     "{}, {}, {}",
         //     self.current_angle, self.angle_step, self.current_loop_dt
         // );
-        self.current_angle
+        Ok(self.current_angle)
     }
 }

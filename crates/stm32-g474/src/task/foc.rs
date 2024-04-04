@@ -1,3 +1,4 @@
+use defmt::error;
 use embassy_stm32::peripherals;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::Timer;
@@ -18,11 +19,11 @@ pub async fn current_loop(
     mut pwm: Pwms<peripherals::TIM1>,
 ) {
     let mut angle_sensor = TestAngleSensor::new(180_f32.to_radians(), 0.00005);
-    let mut send_to_usb_data: (f32, f32, f32);
 
     loop {
         //debug!("enter: {}", embassy_time::Instant::now());
         {
+            // let begin = embassy_time::Instant::now();
             let mut foc = foc.lock().await;
             let foc = foc.as_mut().unwrap();
             let bus_voltage = vbus_adc.get_voltage();
@@ -34,22 +35,30 @@ pub async fn current_loop(
                 &mut pwm,
             ) {
                 match e {
-                    CurrentLoopError::MisAngleSensor => {}
-                    CurrentLoopError::MisCurrentSensor => {}
-                    CurrentLoopError::MisCurrentAdcs => {}
+                    CurrentLoopError::MisAngleSensor => {
+                        panic!("mis angle sensor")
+                    }
+                    CurrentLoopError::MisCurrentSensor => {
+                        panic!("mis current sensor")
+                    }
+                    CurrentLoopError::MisCurrentAdcs => {
+                        panic!("mis current adc")
+                    }
+                    CurrentLoopError::NoAngleData => {
+                        error!("encoder is distracted!")
+                    }
                 }
             }
 
-            send_to_usb_data = foc.current_raw_i;
+            // let end = embassy_time::Instant::now();
+            // debug!("{}", (end - begin).as_micros());
+
+            let (u, v, w) = foc.current_i_uvw;
+            comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
+
+            // let (d, q) = foc.current_i;
+            // comm_sender.try_send(SharedEvent::Idq(d, q)).ok();
         }
-        //debug!("out: {}", embassy_time::Instant::now());
-        let (u, v, w) = send_to_usb_data;
-        comm_sender.try_send(SharedEvent::UvwI(u, v, w)).ok();
-        // let begin = embassy_time::Instant::now();
-        // let res = embassy_time::Instant::now() - begin;
-        // let res = res.as_micros();
-        // debug!("time: {}", res);
-        // info!("{}", embassy_time::Instant::now());
         Timer::after_micros(5).await
     }
 }

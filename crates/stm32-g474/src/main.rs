@@ -39,8 +39,12 @@ bind_interrupts!(struct Irqs {
 static EXECUTOR_FOC_LOOP: InterruptExecutor = InterruptExecutor::new();
 static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 
+#[allow(dead_code)]
 enum SharedEvent {
-    UvwI(f32, f32, f32),
+    Iuvw(f32, f32, f32),
+    Idq(f32, f32),
+    Position { current: f32, expect: f32 },
+    Velocity { current: f32, expect: f32 },
 }
 
 type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::FOC>>;
@@ -186,7 +190,7 @@ fn main() -> ! {
         // },
         LoopMode::TorqueWithSensor {
             current_pid: foc::PID::new(1.0, 0.0, 0.0, 0.000_5, 0.0, 1.0, 1.0),
-            expect_current: 0.1,
+            expect_current: 0.0,
         },
         Some(CurrentSensor::new(
             0.005,

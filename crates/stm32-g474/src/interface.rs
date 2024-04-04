@@ -28,61 +28,6 @@ where
     }
 }
 
-// pub struct Adcs<T, A, B, C>
-// where
-//     T: embassy_stm32::adc::Instance,
-//     A: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     B: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     C: AdcPin<T> + embassy_stm32::gpio::Pin,
-// {
-//     adc: Adc<'static, T>,
-//     pin0: A,
-//     pin1: B,
-//     pin2: C,
-// }
-
-// impl<T, A, B, C> Adcs<T, A, B, C>
-// where
-//     T: embassy_stm32::adc::Instance,
-//     A: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     B: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     C: AdcPin<T> + embassy_stm32::gpio::Pin,
-// {
-//     pub fn new(adc: Adc<'static, T>, pin0: A, pin1: B, pin2: C) -> Self {
-//         // pin0.set_as_analog();
-//         // embassy_stm32::pac::GPIOA
-//         //     .moder()
-//         //     .modify(|w| w.set_moder(0, embassy_stm32::pac::gpio::vals::Moder::ANALOG));
-//         Self {
-//             adc,
-//             pin0,
-//             pin1,
-//             pin2,
-//         }
-//     }
-// }
-
-// impl<T, A, B, C> interface::Adcs for Adcs<T, A, B, C>
-// where
-//     T: embassy_stm32::adc::Instance,
-//     A: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     B: AdcPin<T> + embassy_stm32::gpio::Pin,
-//     C: AdcPin<T> + embassy_stm32::gpio::Pin,
-// {
-//     fn get_voltage(&mut self) -> (f32, f32, f32) {
-//         let a = self.adc.read(&mut self.pin0) as f32 / 4096.;
-//         let b = self.adc.read(&mut self.pin1) as f32 / 4096.;
-//         let c = self.adc.read(&mut self.pin2) as f32 / 4096.;
-
-//         // let adc = embassy_stm32::pac::ADC1;
-//         // let a = adc.jdr(0).read().0 as f32 / 4096.;
-//         // let b = adc.jdr(1).read().0 as f32 / 4096.;
-//         // let c = adc.jdr(2).read().0 as f32 / 4096.;
-//         // debug!("{}, {}, {}", a, b, c);
-//         (a, b, c)
-//     }
-// }
-
 pub struct Adcs {}
 
 impl Adcs {

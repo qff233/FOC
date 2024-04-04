@@ -21,16 +21,27 @@ async fn process_usb_data(
         return (None, State::LoopSend);
     }
 
-    let data = match foc_receiver.unwrap() {
-        SharedEvent::UvwI(u, v, w) => {
-            let mut data: Vec<u8, 32> = Vec::new();
+    let mut data: Vec<u8, 32> = Vec::new();
+    match foc_receiver.unwrap() {
+        SharedEvent::Iuvw(u, v, w) => {
             data.extend_from_slice(&u.to_le_bytes()).unwrap();
             data.extend_from_slice(&v.to_le_bytes()).unwrap();
             data.extend_from_slice(&w.to_le_bytes()).unwrap();
-            data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();
-            data
         }
-    };
+        SharedEvent::Idq(d, q) => {
+            data.extend_from_slice(&d.to_le_bytes()).unwrap();
+            data.extend_from_slice(&q.to_le_bytes()).unwrap();
+        }
+        SharedEvent::Velocity { current, expect } => {
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+        }
+        SharedEvent::Position { current, expect } => {
+            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
+        }
+    }
+    data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();
 
     (Some(data), State::LoopSend)
 }
