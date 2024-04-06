@@ -36,16 +36,12 @@ impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
             self.cs_pin.set_high().unwrap();
 
             let recv_data = (recv_data[1] as u16) << 8 | recv_data[3] as u16;
-            let count = (0..16)
-                .into_iter()
-                .map(|pos| {
-                    if recv_data & (0x0001 << pos) != 0 {
-                        1
-                    } else {
-                        0
-                    }
-                })
-                .count();
+            let mut count = 0;
+            (0..16).for_each(|pos| {
+                if recv_data & (0x0001 << pos) != 0 {
+                    count += 1;
+                }
+            });
 
             if count & 0x01 == 0 {
                 data = Some(recv_data);
@@ -55,13 +51,13 @@ impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
 
         match data {
             Some(data) => {
-                if data & (0x0001 << 1) == 1 {
+                if data & (0x0001 << 1) > 0 {
                     return Err(Mt6818Error::NoMagWarning);
                 }
                 let result = data >> 2;
-                return Ok(result as f32 * 2. * PI / 16384.);
+                Ok(result as f32 * 2. * PI / 16384.)
             }
-            None => return Err(Mt6818Error::NoData),
-        };
+            None => Err(Mt6818Error::NoData),
+        }
     }
 }

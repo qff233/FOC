@@ -17,7 +17,7 @@ async fn process_usb_data(
     _recv_data: &[u8],
 ) -> (Option<Vec<u8, 32>>, State) {
     let foc_receiver = foc_receiver.try_receive().ok();
-    if let None = foc_receiver {
+    if foc_receiver.is_none() {
         return (None, State::LoopSend);
     }
 
@@ -73,45 +73,43 @@ async fn process_usb_connnect(
     class: CdcAcmClass<'static, Driver<'static, peripherals::USB>>,
     foc_receiver: Receiver<'static, CriticalSectionRawMutex, SharedEvent, 64>,
 ) {
+    let mut current_state = State::Reply;
+    let (mut sender, mut recever) = class.split();
+    let mut recv_buf = [0; 64];
     loop {
-        let mut current_state = State::Reply;
-        let (mut sender, mut recever) = class.split();
-        let mut recv_buf = [0; 64];
+        sender.wait_connection().await;
+        recever.wait_connection().await;
+        info!("USB Connected");
         loop {
-            sender.wait_connection().await;
-            recever.wait_connection().await;
-            info!("USB Connected");
-            loop {
-                let data = match current_state {
-                    State::Reply => {
-                        let recv_data_len = match recever.read_packet(&mut recv_buf).await {
-                            Ok(n) => n,
-                            Err(e) => {
-                                if let EndpointError::BufferOverflow = e {
-                                    defmt::panic!("USB Buffer overflow")
-                                }
-                                break;
+            let data = match current_state {
+                State::Reply => {
+                    let recv_data_len = match recever.read_packet(&mut recv_buf).await {
+                        Ok(n) => n,
+                        Err(e) => {
+                            if let EndpointError::BufferOverflow = e {
+                                defmt::panic!("USB Buffer overflow")
                             }
-                        };
-
-                        &recv_buf[..recv_data_len]
-                    }
-                    State::LoopSend => &recv_buf[..0],
-                };
-
-                let (send_data, next_state) = process_usb_data(foc_receiver, data).await;
-                current_state = next_state;
-                if let Some(send_data) = send_data {
-                    // debug!("{:#X}", *send_data);
-                    if let Err(e) = sender.write_packet(&send_data[0..send_data.len()]).await {
-                        if let EndpointError::BufferOverflow = e {
-                            defmt::panic!("USB Buffer overflow");
+                            break;
                         }
                     };
+
+                    &recv_buf[..recv_data_len]
                 }
+                State::LoopSend => &recv_buf[..0],
+            };
+
+            let (send_data, next_state) = process_usb_data(foc_receiver, data).await;
+            current_state = next_state;
+            if let Some(send_data) = send_data {
+                // debug!("{:#X}", *send_data);
+                if let Err(EndpointError::BufferOverflow) =
+                    sender.write_packet(&send_data[0..send_data.len()]).await
+                {
+                    defmt::panic!("USB Buffer overflow");
+                };
             }
-            info!("USB Disconnected");
         }
+        info!("USB Disconnected");
     }
 }
 

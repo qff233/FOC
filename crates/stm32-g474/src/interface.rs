@@ -143,7 +143,7 @@ impl interface::Adcs for Adcs {
         let c = adc.jdr(2).read().0 as f32 * 3.3 / 4096.;
 
         // debug!("{}, {}, {}", a, b, c);
-        (a as f32, b as f32, c as f32)
+        (a, b, c)
     }
 }
 

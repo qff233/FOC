@@ -53,7 +53,7 @@ pub async fn current_loop(
             // let end = embassy_time::Instant::now();
             // debug!("{}", (end - begin).as_micros());
 
-            let (u, v, w) = foc.current_i_uvw;
+            let (u, v, w) = foc.get_i_uvw();
             comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
 
             // let (d, q) = foc.current_i_dq;
