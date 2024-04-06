@@ -6,6 +6,8 @@ use defmt::*;
 use embassy_executor::{Executor, InterruptExecutor};
 use embassy_futures::block_on;
 use embassy_stm32::adc::{Adc, SampleTime};
+use embassy_stm32::gpio::Output;
+use embassy_stm32::spi::{self, Spi, MODE_0, MODE_1};
 use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::CountingMode;
@@ -19,6 +21,7 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::Delay;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
+use foc::angle_sensor::as5048::As5048;
 use foc::current_sensor::CurrentSensor;
 use foc::{LoopMode, MotorParams};
 use static_cell::StaticCell;
@@ -43,19 +46,13 @@ static EXECUTOR_COMM: StaticCell<Executor> = StaticCell::new();
 enum SharedEvent {
     Iuvw(f32, f32, f32),
     Idq(f32, f32),
-    Position {
-        expect: f32,
-        current: f32,
-    },
-    Velocity {
-        expect: f32,
-        current: f32,
-    },
+    Position(f32),
+    Velocity(f32),
     State {
         i_uvw: (f32, f32, f32),
         i_dq: (f32, f32),
-        position: (f32, f32),
-        velocity: (f32, f32),
+        position: f32,
+        velocity: f32,
     },
 }
 
@@ -220,6 +217,15 @@ fn main() -> ! {
         *FOC.lock().await = Some(foc);
     });
 
+    let mut spi_config = spi::Config::default();
+    spi_config.mode = MODE_1;
+    spi_config.frequency = mhz(1);
+    let spi = Spi::new(
+        p.SPI1, p.PB3, p.PB5, p.PB4, p.DMA1_CH1, p.DMA1_CH2, spi_config,
+    );
+
+    let as5048 = As5048::new(spi, Output::new(p.PB6, gpio::Level::High, gpio::Speed::Low));
+
     ////////////////////////////////////////////////////////////
     info!("Init PWM Interrupt...");
 
@@ -231,6 +237,7 @@ fn main() -> ! {
             vbus_adc,
             uvw_adcs,
             pwms,
+            as5048,
         ))
         .unwrap();
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();

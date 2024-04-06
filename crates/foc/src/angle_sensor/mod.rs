@@ -1,5 +1,5 @@
-mod mt6818;
-mod as5048;
+pub mod as5048;
+pub mod mt6818;
 
 use core::f32::consts::PI;
 

@@ -1,3 +1,6 @@
+use core::f32::consts::PI;
+
+use defmt::debug;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiBus;
 
@@ -25,44 +28,32 @@ impl<T: SpiBus, P: OutputPin> As5048<T, P> {
 impl<T: SpiBus, P: OutputPin> AngleSensor for As5048<T, P> {
     type Error = As5048Error;
     fn get_angle(&mut self) -> Result<f32, Self::Error> {
-        // let send_data: [u8; 4] = [0x80 | 0x03, 0x00, 0x80 | 0x04, 0x00];
-        // let mut recv_data = [0; 4];
+        let send_data: [u8; 2] = [0xFF, 0xFF];
+        let mut recv_data = [0; 4];
 
-        // let mut data: Option<u16> = None;
-        // for _ in 0..3 {
-        //     self.cs_pin.set_low().unwrap();
-        //     self.spi.transfer(&mut recv_data, &send_data).unwrap();
-        //     self.spi.flush().unwrap();
-        //     self.cs_pin.set_high().unwrap();
+        self.cs_pin.set_low().unwrap();
+        self.spi.transfer(&mut recv_data, &send_data).unwrap();
+        self.spi.flush().unwrap();
+        self.cs_pin.set_high().unwrap();
 
-        //     let recv_data = (recv_data[1] as u16) << 8 | recv_data[3] as u16;
-        //     let count = (0..16)
-        //         .into_iter()
-        //         .map(|pos| {
-        //             if recv_data & (0x0001 << pos) != 0 {
-        //                 1
-        //             } else {
-        //                 0
-        //             }
-        //         })
-        //         .count();
+        debug!("recv_data: {}", recv_data);
 
-        //     if count & 0x01 == 0 {
-        //         data = Some(recv_data);
-        //         break;
-        //     }
+        let recv_data = (recv_data[0] as u16) << 8 | recv_data[1] as u16;
+
+        let mut count = 0;
+        for i in 0..16 {
+            if (recv_data >> i) & 0x01 != 0 {
+                count += 1;
+            }
+        }
+
+        debug!("count: {}", count);
+
+        // if recv_data & (1 << 14) as u16 != 0 {
+        //     return Err(As5048Error::NoMagWarning);
         // }
 
-        // match data {
-        //     Some(data) => {
-        //         if data & (0x0001 << 1) == 1 {
-        //             return Err(Mt6818Error::NoMagWarning);
-        //         }
-        //         let result = data >> 2;
-        //         return Ok(result as f32 * 2. * PI / 16384.);
-        //     }
-        //     None => return Err(Mt6818Error::NoData),
-        // };
-        Ok(0.)
+        let data = recv_data & 0x3FFF;
+        Ok(data as f32 * 2. * PI / 16383.)
     }
 }

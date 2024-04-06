@@ -1,8 +1,9 @@
 use defmt::error;
-use embassy_stm32::peripherals;
+use embassy_stm32::gpio::Output;
+use embassy_stm32::{peripherals, spi::Spi};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::Timer;
-use foc::{angle_sensor::TestAngleSensor, CurrentLoopError, PositionLoopError, VelocityLoopError};
+use foc::{angle_sensor::as5048::As5048, CurrentLoopError, PositionLoopError, VelocityLoopError};
 
 use crate::{
     interface::{Adcs, Pwms, VbusAdc},
@@ -17,9 +18,11 @@ pub async fn current_loop(
     // mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
     mut uvw_adcs: Adcs,
     mut pwm: Pwms<peripherals::TIM1>,
+    mut angle_sensor: As5048<
+        Spi<'static, peripherals::SPI1, peripherals::DMA1_CH1, peripherals::DMA1_CH2>,
+        Output<'static>,
+    >,
 ) {
-    let mut angle_sensor = TestAngleSensor::new(180_f32.to_radians(), 0.00005);
-
     loop {
         //debug!("enter: {}", embassy_time::Instant::now());
         {
@@ -53,11 +56,15 @@ pub async fn current_loop(
             // let end = embassy_time::Instant::now();
             // debug!("{}", (end - begin).as_micros());
 
-            let (u, v, w) = foc.get_i_uvw();
-            comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
+            // let (u, v, w) = foc.get_i_uvw();
+            // comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
 
             // let (d, q) = foc.current_i_dq;
             // comm_sender.try_send(SharedEvent::Idq(d, q)).ok();
+
+            comm_sender
+                .try_send(SharedEvent::Position(foc.get_position()))
+                .ok();
 
             // comm_sender
             //     .try_send(SharedEvent::Velocity {

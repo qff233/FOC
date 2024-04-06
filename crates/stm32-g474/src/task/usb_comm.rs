@@ -34,11 +34,11 @@ async fn process_usb_data(
         SharedEvent::Idq(d, q) => {
             add_justfloat_data!(data, d, q);
         }
-        SharedEvent::Velocity { expect, current } => {
-            add_justfloat_data!(data, expect, current);
+        SharedEvent::Velocity(velociry) => {
+            add_justfloat_data!(data, velociry);
         }
-        SharedEvent::Position { expect, current } => {
-            add_justfloat_data!(data, expect, current);
+        SharedEvent::Position(position) => {
+            add_justfloat_data!(data, position);
         }
         SharedEvent::State {
             i_uvw,
@@ -47,16 +47,8 @@ async fn process_usb_data(
             velocity,
         } => {
             let (u, v, w) = i_uvw;
-            add_justfloat_data!(data, u, v, w);
-
             let (d, q) = i_dq;
-            add_justfloat_data!(data, d, q);
-
-            let (expect, current) = velocity;
-            add_justfloat_data!(data, expect, current);
-
-            let (expect, current) = position;
-            add_justfloat_data!(data, expect, current);
+            add_justfloat_data!(data, u, v, w, d, q, velocity, position);
         }
     }
     data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();
