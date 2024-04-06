@@ -12,6 +12,12 @@ enum State {
     LoopSend,
 }
 
+macro_rules! add_justfloat_data {
+    ($vec:ident, $($elem:ident),+) => {
+        $($vec.extend_from_slice(&$elem.to_le_bytes()).unwrap());+;
+    };
+}
+
 async fn process_usb_data(
     foc_receiver: Receiver<'static, CriticalSectionRawMutex, SharedEvent, 64>,
     _recv_data: &[u8],
@@ -20,25 +26,19 @@ async fn process_usb_data(
     if foc_receiver.is_none() {
         return (None, State::LoopSend);
     }
-
     let mut data: Vec<u8, 32> = Vec::new();
     match foc_receiver.unwrap() {
         SharedEvent::Iuvw(u, v, w) => {
-            data.extend_from_slice(&u.to_le_bytes()).unwrap();
-            data.extend_from_slice(&v.to_le_bytes()).unwrap();
-            data.extend_from_slice(&w.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, u, v, w);
         }
         SharedEvent::Idq(d, q) => {
-            data.extend_from_slice(&d.to_le_bytes()).unwrap();
-            data.extend_from_slice(&q.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, d, q);
         }
         SharedEvent::Velocity { expect, current } => {
-            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, expect, current);
         }
         SharedEvent::Position { expect, current } => {
-            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, expect, current);
         }
         SharedEvent::State {
             i_uvw,
@@ -47,21 +47,16 @@ async fn process_usb_data(
             velocity,
         } => {
             let (u, v, w) = i_uvw;
-            data.extend_from_slice(&u.to_le_bytes()).unwrap();
-            data.extend_from_slice(&v.to_le_bytes()).unwrap();
-            data.extend_from_slice(&w.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, u, v, w);
 
             let (d, q) = i_dq;
-            data.extend_from_slice(&d.to_le_bytes()).unwrap();
-            data.extend_from_slice(&q.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, d, q);
 
             let (expect, current) = velocity;
-            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, expect, current);
 
             let (expect, current) = position;
-            data.extend_from_slice(&expect.to_le_bytes()).unwrap();
-            data.extend_from_slice(&current.to_le_bytes()).unwrap();
+            add_justfloat_data!(data, expect, current);
         }
     }
     data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();
