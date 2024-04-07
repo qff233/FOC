@@ -1,5 +1,4 @@
 use cortex_m::prelude::_embedded_hal_blocking_delay_DelayUs;
-use defmt::debug;
 use embassy_stm32::adc::{Adc, AdcPin};
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::timer::{AdvancedInstance4Channel, Channel};
@@ -102,7 +101,7 @@ impl Adcs {
         });
 
         // 开始校准ADC
-        debug!("Calibration ADC");
+        // debug!("Calibration ADC");
         ADC1.cr().modify(|w| {
             w.set_adcaldif(vals::Adcaldif::SINGLEENDED);
             w.set_adcallin(true);
@@ -112,7 +111,7 @@ impl Adcs {
         embassy_time::Delay.delay_us(1u8);
 
         // 使能ADC
-        debug!("Enable ADC");
+        // debug!("Enable ADC");
         ADC1.isr().write(|w| w.set_adrdy(true));
         ADC1.cr().modify(|w| w.set_aden(true));
         while ADC1.isr().read().adrdy() {}

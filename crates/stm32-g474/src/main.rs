@@ -7,7 +7,7 @@ use embassy_executor::{Executor, InterruptExecutor};
 use embassy_futures::block_on;
 use embassy_stm32::adc::{Adc, SampleTime};
 use embassy_stm32::gpio::Output;
-use embassy_stm32::spi::{self, Spi, MODE_0, MODE_1};
+use embassy_stm32::spi::{self, Spi, MODE_1};
 use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::CountingMode;
@@ -191,7 +191,7 @@ fn main() -> ! {
             pole_num: 7,
             resistance: None,
             inductance: None,
-            encoder_offset: None,
+            encoder_offset: Some(0.50823027),
         },
         // LoopMode::OpenVelocity {
         //     voltage: 0.15,
@@ -199,8 +199,11 @@ fn main() -> ! {
         // },
         LoopMode::TorqueWithSensor {
             current_pid: foc::PID::new(1.0, 0.0, 0.0, 0.000_5, 0.0, 1.0, 1.0),
-            expect_current: 0.15,
+            expect_current: 0.1,
         },
+        // LoopMode::Calibration {
+        //     encoder_offset: (0, 0.),
+        // },
         Some(CurrentSensor::new(
             0.005,
             16.0,
@@ -224,7 +227,10 @@ fn main() -> ! {
         p.SPI1, p.PB3, p.PB5, p.PB4, p.DMA1_CH1, p.DMA1_CH2, spi_config,
     );
 
-    let as5048 = As5048::new(spi, Output::new(p.PB6, gpio::Level::High, gpio::Speed::Low));
+    let as5048 = As5048::new(
+        spi,
+        Output::new(p.PD2, gpio::Level::High, gpio::Speed::Medium),
+    );
 
     ////////////////////////////////////////////////////////////
     info!("Init PWM Interrupt...");
