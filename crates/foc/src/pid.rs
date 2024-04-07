@@ -8,8 +8,8 @@ pub struct PID {
     pub output_limit: f32,
     pub integral_limit: f32,
     pub last_output: f32,
+    pub integral: f32,
     pub last_error: f32,
-    pub last_integral: f32,
 }
 
 impl PID {
@@ -32,26 +32,37 @@ impl PID {
             output_ramp,
             integral_limit,
             last_error: 0.,
+            integral: 0.,
             last_output: 0.,
-            last_integral: 0.,
         }
     }
 
     #[allow(dead_code)]
     pub fn update(&mut self, error: f32) -> f32 {
         let dt = self.time_interval;
+        self.integral += self.i * 0.5 * dt * (error + self.last_error);
+        self.integral = self
+            .integral
+            .min(self.integral_limit)
+            .max(-self.integral_limit);
 
-        let p_term = self.p * error;
-        let i_term = self.last_integral + self.i * 0.5 * dt * (error + self.last_error);
+        // debug!("{}", self.integral);
 
         let d_term = self.d * (error - self.last_error) / dt;
-        let output = p_term + i_term + d_term;
+        let mut output = self.p * error + self.integral + d_term;
 
         if self.output_ramp > 0. {
-            let _output_rate = (output - self.last_error) / dt;
-
+            let output_rate = (output - self.last_error) / dt;
+            if output_rate > self.output_ramp {
+                output = self.last_output + self.output_ramp * dt;
+            } else if output_rate < -self.output_ramp {
+                output = self.last_output - self.output_ramp * dt;
+            }
         }
-        self.last_integral = i_term;
+        output = output.max(-self.output_limit).min(self.output_limit);
+
+        self.last_output = output;
+        self.last_error = error;
 
         output
     }

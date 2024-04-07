@@ -47,7 +47,7 @@ pub enum LoopMode {
         expect_velocity: f32,
     },
     Calibration {
-        encoder_offset: (u32, f32),
+        has_encoder_offset: bool, // index  offset_count
     },
     PositionWithSensor {
         current_pid: PID,
@@ -61,8 +61,8 @@ pub enum LoopMode {
         expect_velocity: f32,
     },
     TorqueWithSensor {
-        current_pid: PID,
-        expect_current: f32,
+        current_pid: (PID, PID),
+        expect_current: (f32, f32),
     },
     Velocity {
         //TODO 无感不会写
@@ -79,6 +79,7 @@ pub struct MotorParams {
 
 pub struct CurrentState {
     pub i_uvw: (f32, f32, f32), // u v w
+    pub u_dq: (f32, f32),       // ud, uq
     pub i_dq: (f32, f32),       // id, iq
     pub velocity: f32,
     pub position: f32,
@@ -114,6 +115,7 @@ impl FOC {
             current_sensor,
             current_state: CurrentState {
                 i_uvw: (0., 0., 0.),
+                u_dq: (0., 0.),
                 i_dq: (0., 0.),
                 velocity: 0.,
                 position: 0.,
@@ -144,37 +146,35 @@ impl FOC {
             .ok_or(CurrentLoopError::MisAngleSensor)?;
 
         let last_position = current_state.position;
-        let angle = angle_sensor
+        current_state.position = angle_sensor
             .get_angle()
             .map_err(|_| CurrentLoopError::NoAngleData)?;
-        let encoder_offset = motor_params.encoder_offset.unwrap_or(0.);
-        current_state.position = angle * motor_params.pole_num as f32 % (2. * PI) + encoder_offset;
 
         let mut delta_position = current_state.position - last_position;
-        if delta_position.abs() > 2. * PI / 3. {
-            if delta_position > 0. {
-                // From negitive to positive deg.
-                delta_position = -(2. * PI - last_position.abs() + current_state.position);
-            } else {
-                // From positive to negitive deg.
-                delta_position = 2. * PI - last_position + current_state.position.abs();
-            }
+        if delta_position.abs() > (2. * PI / 3.) {
+            delta_position =
+                2. * PI - last_position - delta_position.signum() * current_state.position;
         }
         current_state.velocity = delta_position / current_loop_dt;
+
         let (a, b, c) = current_sensor.get_currnet(*uvw_adcs);
         current_state.i_uvw = (a, b, c);
 
-        let angle_sin_cos = AngleSinCos::new(current_state.position);
+        let encoder_offset = motor_params.encoder_offset.unwrap_or(0.);
+        let mut elec_angle =
+            (current_state.position * motor_params.pole_num as f32 + encoder_offset) % (2. * PI);
+        if elec_angle < 0. {
+            elec_angle += 2. * PI;
+        }
+        // debug!("elec_angle: {}", elec_angle);
+        let angle_sin_cos = AngleSinCos::new(elec_angle);
         current_state.i_dq = park(a, b, c, &angle_sin_cos);
+
         Ok(angle_sin_cos)
     }
 
     fn set_u_dq_angle(ud: f32, uq: f32, angle_sin_cos: &AngleSinCos, pwm: &mut dyn Pwms) {
-        let (a, b, c) = inv_park(
-            ud * 3_f32.sqrt() / 2.,
-            uq * 3_f32.sqrt() / 2.,
-            angle_sin_cos,
-        );
+        let (a, b, c) = inv_park(ud, uq, angle_sin_cos);
         let (a, b, c) = svpwm(a, b, c);
         pwm.set_duty(a, b, c);
     }
@@ -183,9 +183,10 @@ impl FOC {
     pub fn current_tick(
         &mut self,
         _bus_voltage: f32,
-        angle_sensor: Option<&mut impl AngleSensor>,
+        mut angle_sensor: Option<&mut impl AngleSensor>,
         uvw_adcs: Option<&mut dyn Adcs>,
         pwm: &mut dyn Pwms,
+        mut delay: impl embedded_hal::delay::DelayNs,
     ) -> Result<(), CurrentLoopError> {
         match &mut self.loop_mode {
             LoopMode::None => pwm.disable(),
@@ -200,37 +201,33 @@ impl FOC {
                     pwm,
                 );
             }
-            LoopMode::Calibration { encoder_offset } => {
-                let _angle_sin_cos = Self::update_i_velocity_position(
-                    &self.motor_params,
-                    self.current_loop_dt,
-                    angle_sensor,
-                    (self.current_sensor.as_mut(), uvw_adcs),
-                    &mut self.current_state,
-                )?;
+            LoopMode::Calibration { has_encoder_offset } => {
+                if !*has_encoder_offset {
+                    Self::set_u_dq_angle(0.5, 0., &AngleSinCos::new(0.0), pwm);
+                    delay.delay_ms(1000);
 
-                if encoder_offset.0 < 1000 {
-                    encoder_offset.0 += 1;
-                    encoder_offset.1 = 0.;
+                    let mut encoder_offset_count = 0.;
+                    for _ in 0..1000 {
+                        let angle = angle_sensor
+                            .as_mut()
+                            .ok_or(CurrentLoopError::MisAngleSensor)?
+                            .get_angle()
+                            .map_err(|_| CurrentLoopError::NoAngleData)?;
+                        let elec_angle = (angle * self.motor_params.pole_num as f32) % (2.0 * PI);
+                        info!("ele_angle: {}", elec_angle);
+                        encoder_offset_count += -elec_angle;
+                    }
+                    let encoder_offset = encoder_offset_count / 1000.;
+                    Self::set_u_dq_angle(0.0, 0., &AngleSinCos::new(0.0), pwm);
 
-                    Self::set_u_dq_angle(0.3, 0., &AngleSinCos::new(0.0), pwm);
-                    return Ok(());
-                } else if encoder_offset.0 <= 4000 {
-                    encoder_offset.0 += 1;
-                    encoder_offset.1 += -self.current_state.position;
-                    return Ok(());
-                } else if encoder_offset.0 == 4001 {
-                    encoder_offset.0 += 1;
-                    encoder_offset.1 /= 1000.;
-                    self.motor_params.encoder_offset = Some(encoder_offset.1);
-                    info!("Motor encoder offset: {}", encoder_offset.1);
+                    self.motor_params.encoder_offset = Some(encoder_offset);
+                    info!("encoder_offset: {}", encoder_offset);
 
-                    Self::set_u_dq_angle(0., 0.0, &AngleSinCos::new(0.), pwm);
-                    return Ok(());
+                    *has_encoder_offset = true;
                 }
             }
             LoopMode::TorqueWithSensor {
-                current_pid: _,
+                current_pid,
                 expect_current,
             } => {
                 let angle_sin_cos = Self::update_i_velocity_position(
@@ -240,9 +237,21 @@ impl FOC {
                     (self.current_sensor.as_mut(), uvw_adcs),
                     &mut self.current_state,
                 )?;
-                // let iq = current_pid.update(*expect_current - self.current_i.1);
-                // (0., iq, self.current_position)
-                Self::set_u_dq_angle(0., *expect_current, &angle_sin_cos, pwm);
+                // self.current_state.u_dq.0 = current_pid
+                //     .0
+                //     .update(expect_current.0 - self.current_state.i_dq.0);
+                // self.current_state.u_dq.1 = current_pid
+                //     .1
+                //     .update(expect_current.1 - self.current_state.i_dq.1);
+                // Self::set_u_dq_angle(
+                //     self.current_state.u_dq.0,
+                //     self.current_state.u_dq.1,
+                //     &angle_sin_cos,
+                //     pwm,
+                // );
+                self.current_state.u_dq.0 = expect_current.0;
+                self.current_state.u_dq.1 = expect_current.1;
+                Self::set_u_dq_angle(expect_current.0, expect_current.1, &angle_sin_cos, pwm);
             }
             LoopMode::VelocityWithSensor {
                 current_pid,
@@ -297,7 +306,9 @@ impl FOC {
                     self.current_state.position = if *expect_velocity > 0. { -PI } else { PI }
                 };
             }
-            LoopMode::Calibration { encoder_offset: _ } => (),
+            LoopMode::Calibration {
+                has_encoder_offset: _,
+            } => (),
             LoopMode::VelocityWithSensor {
                 current_pid: _,
                 velocity_pid,
@@ -345,7 +356,7 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    pub fn set_expect_current(&mut self, current: f32) -> Result<(), SetError> {
+    pub fn set_expect_current(&mut self, current: (f32, f32)) -> Result<(), SetError> {
         match &mut self.loop_mode {
             LoopMode::TorqueWithSensor {
                 current_pid: _,
@@ -398,23 +409,8 @@ impl FOC {
     }
 
     #[allow(dead_code)]
-    pub fn get_position(&self) -> f32 {
-        self.current_state.position / self.motor_params.pole_num as f32
-    }
-
-    #[allow(dead_code)]
-    pub fn get_velocity(&self) -> f32 {
-        self.current_state.velocity / self.motor_params.pole_num as f32
-    }
-
-    #[allow(dead_code)]
-    pub fn get_i_dq(&self) -> (f32, f32) {
-        self.current_state.i_dq
-    }
-
-    #[allow(dead_code)]
-    pub fn get_i_uvw(&self) -> (f32, f32, f32) {
-        self.current_state.i_uvw
+    pub fn get_state(&self) -> &CurrentState {
+        &self.current_state
     }
 
     #[allow(dead_code)]

@@ -5,6 +5,7 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender
 use embassy_time::Timer;
 use foc::{angle_sensor::as5048::As5048, CurrentLoopError, PositionLoopError, VelocityLoopError};
 
+use crate::CortexDelay;
 use crate::{
     interface::{Adcs, Pwms, VbusAdc},
     FocMutex, SharedEvent,
@@ -22,9 +23,10 @@ pub async fn current_loop(
         Spi<'static, peripherals::SPI1, peripherals::DMA1_CH1, peripherals::DMA1_CH2>,
         Output<'static>,
     >,
+    delay: CortexDelay,
 ) {
+    // let mut angle_sensor = TestAngleSensor::new(0.0, 0.00005);
     loop {
-        //debug!("enter: {}", embassy_time::Instant::now());
         {
             // let begin = embassy_time::Instant::now();
             let mut foc = foc.lock().await;
@@ -36,6 +38,7 @@ pub async fn current_loop(
                 Some(&mut angle_sensor),
                 Some(&mut uvw_adcs),
                 &mut pwm,
+                delay.clone(),
             ) {
                 match e {
                     CurrentLoopError::MisAngleSensor => {
@@ -56,21 +59,29 @@ pub async fn current_loop(
             // let end = embassy_time::Instant::now();
             // debug!("{}", (end - begin).as_micros());
 
+            let state = foc.get_state();
+            comm_sender
+                .try_send(SharedEvent::State {
+                    i_uvw: state.i_uvw,
+                    u_dq: state.u_dq,
+                    i_dq: state.i_dq,
+                    position: state.position,
+                    velocity: state.velocity,
+                })
+                .ok();
+
             // let (u, v, w) = foc.get_i_uvw();
             // comm_sender.try_send(SharedEvent::Iuvw(u, v, w)).ok();
 
-            // let (d, q) = foc.current_i_dq;
+            // let (d, q) = foc.get_i_dq();
             // comm_sender.try_send(SharedEvent::Idq(d, q)).ok();
 
-            comm_sender
-                .try_send(SharedEvent::Position(foc.get_position()))
-                .ok();
+            // comm_sender
+            //     .try_send(SharedEvent::Position(foc.get_position()))
+            //     .ok();
 
             // comm_sender
-            //     .try_send(SharedEvent::Velocity {
-            //         expect: 0.0,
-            //         current: foc.get_velocity(),
-            //     })
+            //     .try_send(SharedEvent::Velocity(foc.get_velocity()))
             //     .ok();
         }
         Timer::after_micros(5).await

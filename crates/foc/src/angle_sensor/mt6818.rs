@@ -4,6 +4,8 @@ use embedded_hal::{digital::OutputPin, spi::SpiBus};
 
 use crate::angle_sensor::AngleSensor;
 
+use super::Direction;
+
 pub enum Mt6818Error {
     NoMagWarning,
     NoData,
@@ -13,17 +15,27 @@ pub enum Mt6818Error {
 pub struct Mt6818<T: SpiBus, P: OutputPin> {
     spi: T,
     cs_pin: P,
+    direction: Direction,
 }
 
 impl<T: SpiBus, P: OutputPin> Mt6818<T, P> {
     #[allow(dead_code)]
-    pub fn new(spi: T, cs_pin: P) -> Self {
-        Self { spi, cs_pin }
+    pub fn new(spi: T, cs_pin: P, direction: Direction) -> Self {
+        Self {
+            spi,
+            cs_pin,
+            direction,
+        }
     }
 }
 
 impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
     type Error = Mt6818Error;
+
+    fn set_direction(&mut self, dir: Direction) {
+        self.direction = dir;
+    }
+
     fn get_angle(&mut self) -> Result<f32, Self::Error> {
         let send_data: [u8; 4] = [0x80 | 0x03, 0x00, 0x80 | 0x04, 0x00];
         let mut recv_data = [0; 4];
@@ -55,7 +67,11 @@ impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
                     return Err(Mt6818Error::NoMagWarning);
                 }
                 let result = data >> 2;
-                Ok(result as f32 * 2. * PI / 16384.)
+                if let Direction::CW = self.direction {
+                    Ok(result as f32 * 2. * PI / 16383.)
+                } else {
+                    Ok(-(result as f32) * 2. * PI / 16383.)
+                }
             }
             None => Err(Mt6818Error::NoData),
         }

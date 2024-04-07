@@ -21,12 +21,12 @@ macro_rules! add_justfloat_data {
 async fn process_usb_data(
     foc_receiver: Receiver<'static, CriticalSectionRawMutex, SharedEvent, 64>,
     _recv_data: &[u8],
-) -> (Option<Vec<u8, 32>>, State) {
+) -> (Option<Vec<u8, 64>>, State) {
     let foc_receiver = foc_receiver.try_receive().ok();
     if foc_receiver.is_none() {
         return (None, State::LoopSend);
     }
-    let mut data: Vec<u8, 32> = Vec::new();
+    let mut data: Vec<u8, 64> = Vec::new();
     match foc_receiver.unwrap() {
         SharedEvent::Iuvw(u, v, w) => {
             add_justfloat_data!(data, u, v, w);
@@ -42,13 +42,15 @@ async fn process_usb_data(
         }
         SharedEvent::State {
             i_uvw,
+            u_dq,
             i_dq,
             position,
             velocity,
         } => {
             let (u, v, w) = i_uvw;
-            let (d, q) = i_dq;
-            add_justfloat_data!(data, u, v, w, d, q, velocity, position);
+            let (ud, uq) = u_dq;
+            let (id, iq) = i_dq;
+            add_justfloat_data!(data, u, v, w, ud, uq, id, iq, velocity, position);
         }
     }
     data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();

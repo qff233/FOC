@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use cortex_m::delay;
 use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, InterruptExecutor};
@@ -22,6 +23,7 @@ use embassy_time::Delay;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
 use foc::angle_sensor::as5048::As5048;
+use foc::angle_sensor::Direction;
 use foc::current_sensor::CurrentSensor;
 use foc::{LoopMode, MotorParams};
 use static_cell::StaticCell;
@@ -50,6 +52,7 @@ enum SharedEvent {
     Velocity(f32),
     State {
         i_uvw: (f32, f32, f32),
+        u_dq: (f32, f32),
         i_dq: (f32, f32),
         position: f32,
         velocity: f32,
@@ -191,24 +194,23 @@ fn main() -> ! {
             pole_num: 7,
             resistance: None,
             inductance: None,
-            encoder_offset: Some(0.50823027),
+            encoder_offset: Some(-3.0097091),
         },
-        // LoopMode::OpenVelocity {
-        //     voltage: 0.15,
-        //     expect_velocity: 90f32.to_radians(),
-        // },
         LoopMode::TorqueWithSensor {
-            current_pid: foc::PID::new(1.0, 0.0, 0.0, 0.000_5, 0.0, 1.0, 1.0),
-            expect_current: 0.1,
+            current_pid: (
+                foc::PID::new(0.0005, 0.08, 0.0, 0.000_05, 0.0, 1.0, 1.0), // id
+                foc::PID::new(0.3925, 0.0, 0.138888, 0.000_05, 0.0, 1.0, 1.0), // iq
+            ),
+            expect_current: (0.0, 0.2),
         },
         // LoopMode::Calibration {
-        //     encoder_offset: (0, 0.),
+        //     has_encoder_offset: false,
         // },
         Some(CurrentSensor::new(
             0.005,
             16.0,
             &mut pwms,
-            &mut Delay,
+            &mut embassy_time::Delay,
             &mut uvw_adcs,
         )),
         1. / 20_000.,
@@ -230,6 +232,7 @@ fn main() -> ! {
     let as5048 = As5048::new(
         spi,
         Output::new(p.PD2, gpio::Level::High, gpio::Speed::Medium),
+        Direction::CCW,
     );
 
     ////////////////////////////////////////////////////////////
@@ -244,6 +247,7 @@ fn main() -> ! {
             uvw_adcs,
             pwms,
             as5048,
+            CortexDelay::new(),
         ))
         .unwrap();
     spawner.spawn(task::velocity_loop(&FOC)).unwrap();
@@ -267,5 +271,18 @@ unsafe fn ADC1_2() {
     if embassy_stm32::pac::ADC1.isr().read().jeos() {
         EXECUTOR_FOC_LOOP.on_interrupt();
         embassy_stm32::pac::ADC1.isr().write(|w| w.set_jeos(true));
+    }
+}
+
+#[derive(Clone)]
+struct CortexDelay {}
+impl CortexDelay {
+    fn new() -> Self {
+        Self {}
+    }
+}
+impl embedded_hal::delay::DelayNs for CortexDelay {
+    fn delay_ns(&mut self, ns: u32) {
+        cortex_m::asm::delay(1);
     }
 }

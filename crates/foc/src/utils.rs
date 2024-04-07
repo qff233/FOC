@@ -1,68 +1,40 @@
-use core::f32::consts::PI;
-
 use micromath::F32Ext;
 
 #[allow(dead_code)]
 pub struct AngleSinCos {
-    pub cos_alpha: f32,
-    pub sin_alpha: f32,
-    pub cos_beta: f32,
-    pub sin_beta: f32,
-    pub cos_gamma: f32,
-    pub sin_gamma: f32,
+    pub cos: f32,
+    pub sin: f32,
 }
 impl AngleSinCos {
     #[allow(dead_code)]
-    pub fn new(mut angle: f32) -> Self {
-        angle = angle.min(2. * PI).max(0.);
-
-        let theta = angle - 120_f32.to_radians(); // angle - 120
-        let beta = angle + 120_f32.to_radians(); // angle + 120
-
-        let cos_alpha = angle.cos();
-        let sin_alpha = angle.sin();
-        let cos_beta = theta.cos();
-        let sin_beta = theta.sin();
-        let cos_gamma = beta.cos();
-        let sin_gamma = beta.sin();
-        Self {
-            cos_alpha,
-            sin_alpha,
-            cos_beta,
-            sin_beta,
-            cos_gamma,
-            sin_gamma,
-        }
+    pub fn new(angle: f32) -> Self {
+        let cos = angle.cos();
+        let sin = angle.sin();
+        Self { cos, sin }
     }
 }
 
-pub fn park(a: f32, b: f32, c: f32, cos_sin: &AngleSinCos) -> (f32, f32) {
-    let a1 = cos_sin.cos_alpha;
-    let a2 = cos_sin.cos_beta;
-    let a3 = cos_sin.cos_gamma;
-    let b1 = -cos_sin.sin_alpha;
-    let b2 = -cos_sin.sin_beta;
-    let b3 = -cos_sin.sin_gamma;
+pub fn park(a: f32, b: f32, _c: f32, cos_sin: &AngleSinCos) -> (f32, f32) {
+    let alpha = a;
+    let beta = 3_f32.sqrt() / 3. * (a + 2. * b);
 
-    let d = 2.0 / 3. * (a1 * a + a2 * b + a3 * c);
-    let q = 2.0 / 3. * (b1 * a + b2 * b + b3 * c);
+    let cos = cos_sin.cos;
+    let sin = cos_sin.sin;
+    let d = cos * alpha + sin * beta;
+    let q = -sin * alpha + cos * beta;
     (d, q)
 }
 
 pub fn inv_park(d: f32, q: f32, cos_sin: &AngleSinCos) -> (f32, f32, f32) {
-    let a1 = cos_sin.cos_alpha;
-    let a2 = -cos_sin.sin_alpha;
-    let b1 = cos_sin.cos_beta;
-    let b2 = -cos_sin.sin_beta;
-    let c1 = cos_sin.cos_gamma;
-    let c2 = -cos_sin.sin_gamma;
+    let cos = cos_sin.cos;
+    let sin = cos_sin.sin;
+    let beta = cos * d - sin * q;
+    let alpha = sin * d + cos * q;
 
-    let a = a1 * d + a2 * q;
-    let b = b1 * d + b2 * q;
-    let c = c1 * d + c2 * q;
-
+    let a = alpha;
+    let b = -0.5 * alpha + 0.5 * 3_f32.sqrt() * beta;
+    let c = -0.5 * alpha - 0.5 * 3_f32.sqrt() * beta;
     // info!("{} {} {}", a, b, c);
-
     (a, b, c)
 }
 

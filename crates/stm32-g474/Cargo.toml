@@ -42,5 +42,6 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 heapless = { version = "0.8", default-features = false }
 
 static_cell = "2.0"
+embedded-hal = "1.0"
 
 foc = { path = "../foc" }
