@@ -89,9 +89,9 @@ impl Adcs {
         });
         // 配置采样周期
         embassy_stm32::pac::ADC1.smpr(0).modify(|w| {
-            w.set_smp(0, vals::SampleTime::CYCLES2_5);
-            w.set_smp(1, vals::SampleTime::CYCLES2_5);
-            w.set_smp(2, vals::SampleTime::CYCLES2_5);
+            w.set_smp(0, vals::SampleTime::CYCLES1_5);
+            w.set_smp(1, vals::SampleTime::CYCLES1_5);
+            w.set_smp(2, vals::SampleTime::CYCLES1_5);
         });
         // 配置单端输入
         ADC1.difsel().modify(|w| {
@@ -142,7 +142,7 @@ impl interface::Adcs for Adcs {
         let c = adc.jdr(2).read().0 as f32 * 3.3 / 4096.;
 
         // debug!("{}, {}, {}", a, b, c);
-        (a, b, c)
+        (c, b, a)
     }
 }
 

@@ -25,7 +25,7 @@ pub async fn current_loop(
     >,
     delay: CortexDelay,
 ) {
-    // let mut angle_sensor = TestAngleSensor::new(0.0, 0.00005);
+    // let mut angle_sensor = foc::angle_sensor::TestAngleSensor::new(180_f32.to_radians(), 0.00005);
     loop {
         {
             // let begin = embassy_time::Instant::now();

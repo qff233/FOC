@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use cortex_m::delay;
 use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, InterruptExecutor};
@@ -25,7 +24,7 @@ use embassy_usb::Builder;
 use foc::angle_sensor::as5048::As5048;
 use foc::angle_sensor::Direction;
 use foc::current_sensor::CurrentSensor;
-use foc::{LoopMode, MotorParams};
+use foc::{LoopMode, MotorParams, Pll2};
 use static_cell::StaticCell;
 
 use crate::interface::{Adcs, Pwms, VbusAdc};
@@ -194,15 +193,24 @@ fn main() -> ! {
             pole_num: 7,
             resistance: None,
             inductance: None,
-            encoder_offset: Some(-3.0097091),
+            encoder_offset: Some(-2.6825993),
         },
-        LoopMode::TorqueWithSensor {
+        LoopMode::VelocityWithSensor {
             current_pid: (
-                foc::PID::new(0.0005, 0.08, 0.0, 0.000_05, 0.0, 1.0, 1.0), // id
-                foc::PID::new(0.3925, 0.0, 0.138888, 0.000_05, 0.0, 1.0, 1.0), // iq
+                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
+                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
             ),
-            expect_current: (0.0, 0.2),
+            velocity_pid: foc::Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+            pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
+            expect_velocity: 360_f32.to_radians(),
         },
+        // LoopMode::TorqueWithSensor {
+        //     current_pid: (
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
+        //     ),
+        //     expect_current: (0.0, 0.3),
+        // },
         // LoopMode::Calibration {
         //     has_encoder_offset: false,
         // },
@@ -224,7 +232,7 @@ fn main() -> ! {
 
     let mut spi_config = spi::Config::default();
     spi_config.mode = MODE_1;
-    spi_config.frequency = mhz(1);
+    spi_config.frequency = mhz(10);
     let spi = Spi::new(
         p.SPI1, p.PB3, p.PB5, p.PB4, p.DMA1_CH1, p.DMA1_CH2, spi_config,
     );
@@ -232,7 +240,7 @@ fn main() -> ! {
     let as5048 = As5048::new(
         spi,
         Output::new(p.PD2, gpio::Level::High, gpio::Speed::Medium),
-        Direction::CCW,
+        Direction::CW,
     );
 
     ////////////////////////////////////////////////////////////
@@ -283,6 +291,6 @@ impl CortexDelay {
 }
 impl embedded_hal::delay::DelayNs for CortexDelay {
     fn delay_ns(&mut self, ns: u32) {
-        cortex_m::asm::delay(1);
+        cortex_m::asm::delay(ns);
     }
 }

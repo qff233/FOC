@@ -1,5 +1,5 @@
 #[allow(dead_code)]
-pub struct PID {
+pub struct Pid {
     pub p: f32,
     pub i: f32,
     pub d: f32,
@@ -12,7 +12,7 @@ pub struct PID {
     pub last_error: f32,
 }
 
-impl PID {
+impl Pid {
     #[allow(dead_code)]
     pub fn new(
         p: f32,
