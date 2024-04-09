@@ -24,7 +24,7 @@ use embassy_usb::Builder;
 use foc::angle_sensor::as5048::As5048;
 use foc::angle_sensor::Direction;
 use foc::current_sensor::CurrentSensor;
-use foc::{LoopMode, MotorParams, Pll2};
+use foc::{LoopMode, MotorParams, Pid, Pll2};
 use static_cell::StaticCell;
 
 use crate::interface::{Adcs, Pwms, VbusAdc};
@@ -195,15 +195,33 @@ fn main() -> ! {
             inductance: None,
             encoder_offset: Some(-2.6825993),
         },
-        LoopMode::VelocityWithSensor {
+        LoopMode::PositionVelocityWithSensor {
             current_pid: (
                 foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
                 foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
             ),
-            velocity_pid: foc::Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+            velocity_pid: Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+            position_pid: Pid::new(5.0, 1.0, 0.0, 1. / 1_000., 0.0, 10., 20.),
             pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
-            expect_velocity: 360_f32.to_radians(),
+            expect_position: 0.0,
         },
+        // LoopMode::VelocityWithSensor {
+        //     current_pid: (
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
+        //     ),
+        //     velocity_pid: Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+        //     pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
+        //     expect_velocity: 360_f32.to_radians(),
+        // },
+        // LoopMode::PositionWithSensor {
+        //     current_pid: (
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
+        //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
+        //     ),
+        //     position_pid: Pid::new(0.00000000001, 0.0000, 0.8, 1. / 1_000., 0.7, 2.0, 2.0),
+        //     expect_position: 0.0,
+        // },
         // LoopMode::TorqueWithSensor {
         //     current_pid: (
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id

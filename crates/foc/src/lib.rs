@@ -394,7 +394,15 @@ impl FOC {
                 position_pid,
                 expect_position,
             } => {
-                position_pid.update(*expect_position - self.current_state.position);
+                let mut err = *expect_position - self.current_state.position;
+                if err.abs() > PI {
+                    if err.is_sign_negative() {
+                        err += 2. * PI;
+                    } else {
+                        err -= 2. * PI;
+                    }
+                }
+                position_pid.update(err);
             }
             LoopMode::PositionVelocityWithSensor {
                 current_pid: _,
@@ -403,7 +411,15 @@ impl FOC {
                 pll: _,
                 expect_position,
             } => {
-                position_pid.update(*expect_position - self.current_state.position);
+                let mut err = *expect_position - self.current_state.position;
+                if err.abs() > PI {
+                    if err.is_sign_negative() {
+                        err += 2. * PI;
+                    } else {
+                        err -= 2. * PI;
+                    }
+                }
+                position_pid.update(err);
             }
             _ => {
                 return Err(PositionLoopError::NoRequirePositionLoop);
