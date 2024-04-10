@@ -23,7 +23,7 @@ use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
 use foc::angle_sensor::as5048::As5048;
 use foc::angle_sensor::Direction;
-use foc::current_sensor::CurrentSensor;
+use foc::current_sensor::ISensor;
 use foc::{LoopMode, MotorParams, Pid, Pll2};
 use static_cell::StaticCell;
 
@@ -53,12 +53,12 @@ enum SharedEvent {
         i_uvw: (f32, f32, f32),
         u_dq: (f32, f32),
         i_dq: (f32, f32),
-        position: f32,
+        position: (i32, f32),
         velocity: f32,
     },
 }
 
-type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::FOC>>;
+type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::Foc>>;
 static SHAREDCHANNEL: Channel<CriticalSectionRawMutex, SharedEvent, 64> = Channel::new();
 
 #[entry]
@@ -188,7 +188,7 @@ fn main() -> ! {
     let vbus_adc = VbusAdc::new(adc2, p.PC5);
     // let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
-    let foc = foc::FOC::new(
+    let foc = foc::Foc::new(
         MotorParams {
             pole_num: 7,
             resistance: None,
@@ -203,7 +203,7 @@ fn main() -> ! {
             velocity_pid: Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
             position_pid: Pid::new(5.0, 1.0, 0.0, 1. / 1_000., 0.0, 10., 20.),
             pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
-            expect_position: 0.0,
+            expect_position: (0, 0.0),
         },
         // LoopMode::VelocityWithSensor {
         //     current_pid: (
@@ -232,13 +232,13 @@ fn main() -> ! {
         // LoopMode::Calibration {
         //     has_encoder_offset: false,
         // },
-        Some(CurrentSensor::new(
+        ISensor::new(
             0.005,
             16.0,
             &mut pwms,
             &mut embassy_time::Delay,
             &mut uvw_adcs,
-        )),
+        ),
         1. / 20_000.,
         1. / 8_000.,
         1. / 1_000.,

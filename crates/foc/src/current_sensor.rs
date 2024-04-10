@@ -3,13 +3,13 @@ use embedded_hal::delay;
 use crate::driver::interface::{Adcs, Pwms};
 
 #[allow(dead_code)]
-pub struct CurrentSensor {
+pub struct ISensor {
     sampling_resistor: f32,
     large_factor: f32,
     voltage_offset: (f32, f32, f32),
 }
 
-impl CurrentSensor {
+impl ISensor {
     #[allow(dead_code)]
     pub fn new(
         sampling_resistor: f32,

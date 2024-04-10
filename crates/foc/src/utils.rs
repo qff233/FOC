@@ -8,8 +8,7 @@ pub struct AngleSinCos {
 impl AngleSinCos {
     #[allow(dead_code)]
     pub fn new(angle: f32) -> Self {
-        let sin = angle.sin();
-        let cos = angle.cos();
+        let (sin, cos) = angle.sin_cos();
         Self { sin, cos }
     }
 }

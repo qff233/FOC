@@ -1,10 +1,11 @@
 use core::f32::consts::PI;
 
 use embedded_hal::{digital::OutputPin, spi::SpiBus};
+use micromath::F32Ext;
 
 use crate::angle_sensor::AngleSensor;
 
-use super::Direction;
+use super::{AngleSensorError, Direction};
 
 pub enum Mt6818Error {
     NoMagWarning,
@@ -16,6 +17,9 @@ pub struct Mt6818<T: SpiBus, P: OutputPin> {
     spi: T,
     cs_pin: P,
     direction: Direction,
+
+    count_lap: i32,
+    last_angle: f32,
 }
 
 impl<T: SpiBus, P: OutputPin> Mt6818<T, P> {
@@ -25,18 +29,18 @@ impl<T: SpiBus, P: OutputPin> Mt6818<T, P> {
             spi,
             cs_pin,
             direction,
+            count_lap: 0,
+            last_angle: 0.0,
         }
     }
 }
 
 impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
-    type Error = Mt6818Error;
-
     fn set_direction(&mut self, dir: Direction) {
         self.direction = dir;
     }
 
-    fn get_angle(&mut self) -> Result<f32, Self::Error> {
+    fn get_lap_angle(&mut self) -> Result<f32, AngleSensorError> {
         let send_data: [u8; 4] = [0x80 | 0x03, 0x00, 0x80 | 0x04, 0x00];
         let mut recv_data = [0; 4];
 
@@ -64,7 +68,7 @@ impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
         match data {
             Some(data) => {
                 if data & (0x0001 << 1) > 0 {
-                    return Err(Mt6818Error::NoMagWarning);
+                    return Err(AngleSensorError::NoMagWarning);
                 }
                 let result = data >> 2;
                 if let Direction::CW = self.direction {
@@ -73,7 +77,20 @@ impl<T: SpiBus, P: OutputPin> AngleSensor for Mt6818<T, P> {
                     Ok(-(result as f32) * 2. * PI / 16383.)
                 }
             }
-            None => Err(Mt6818Error::NoData),
+            None => Err(AngleSensorError::NoData),
         }
+    }
+    fn get_angle(&mut self) -> Result<(i32, f32), AngleSensorError> {
+        let current_angle = self.get_lap_angle()?;
+        let delta_angle = current_angle - self.last_angle;
+        if delta_angle.abs() > PI {
+            if delta_angle.is_sign_positive() {
+                self.count_lap -= 1;
+            } else {
+                self.count_lap += 1;
+            }
+        }
+        self.last_angle = current_angle;
+        Ok((self.count_lap, current_angle))
     }
 }

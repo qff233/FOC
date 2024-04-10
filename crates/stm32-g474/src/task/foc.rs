@@ -36,20 +36,11 @@ pub async fn current_loop(
             if let Err(e) = foc.current_tick(
                 bus_voltage,
                 Some(&mut angle_sensor),
-                Some(&mut uvw_adcs),
+                &mut uvw_adcs,
                 &mut pwm,
                 delay.clone(),
             ) {
                 match e {
-                    CurrentLoopError::MisAngleSensor => {
-                        panic!("mis angle sensor")
-                    }
-                    CurrentLoopError::MisCurrentSensor => {
-                        panic!("mis current sensor")
-                    }
-                    CurrentLoopError::MisCurrentAdcs => {
-                        panic!("mis current adc")
-                    }
                     CurrentLoopError::NoAngleData => {
                         error!("encoder is distracted!")
                     }
@@ -84,7 +75,7 @@ pub async fn current_loop(
             //     .try_send(SharedEvent::Velocity(foc.get_velocity()))
             //     .ok();
         }
-        Timer::after_micros(5).await
+        Timer::after_micros(50).await
     }
 }
 
