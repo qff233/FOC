@@ -50,7 +50,19 @@ async fn process_usb_data(
             let (u, v, w) = i_uvw;
             let (ud, uq) = u_dq;
             let (id, iq) = i_dq;
-            add_justfloat_data!(data, u, v, w, ud, uq, id, iq, velocity, position.0, position.1);
+            add_justfloat_data!(
+                data,
+                u,
+                v,
+                w,
+                ud,
+                uq,
+                id,
+                iq,
+                velocity,
+                position.0 as f32,
+                position.1
+            );
         }
     }
     data.extend_from_slice(&[0x00, 0x00, 0x80, 0x7F]).unwrap();

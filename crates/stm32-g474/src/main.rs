@@ -200,9 +200,9 @@ fn main() -> ! {
                 foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
                 foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
             ),
-            velocity_pid: Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
-            position_pid: Pid::new(5.0, 1.0, 0.0, 1. / 1_000., 0.0, 10., 20.),
-            pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
+            velocity_pid: Pid::new(0.4, 0.001, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+            position_pid: Pid::new(10.0, 5.5, 0.0, 1. / 1_000., 0.0, 60., 1.5),
+            pll: Pll2::new(0.005, 0.05, 1. / 8_000.),
             expect_position: (0, 0.0),
         },
         // LoopMode::VelocityWithSensor {
@@ -210,8 +210,8 @@ fn main() -> ! {
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
         //     ),
-        //     velocity_pid: Pid::new(0.4, 0.0005, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
-        //     pll: Pll2::new(0.003, 0.05, 1. / 8_000.),
+        //     velocity_pid: Pid::new(0.4, 0.001, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+        //     pll: Pll2::new(0.005, 0.05, 1. / 8_000.),
         //     expect_velocity: 360_f32.to_radians(),
         // },
         // LoopMode::PositionWithSensor {
