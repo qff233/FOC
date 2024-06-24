@@ -1,31 +1,42 @@
 #![no_std]
 #![no_main]
+#![allow(mutable_transmutes)]
+
+use core::mem;
 
 use cortex_m_rt::entry;
+
 use defmt::*;
-use embassy_executor::{Executor, InterruptExecutor};
-use embassy_futures::block_on;
-use embassy_stm32::adc::{Adc, SampleTime};
-use embassy_stm32::gpio::Output;
-use embassy_stm32::spi::{self, Spi, MODE_1};
-use embassy_stm32::time::{khz, mhz};
-use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
-use embassy_stm32::timer::low_level::CountingMode;
-use embassy_stm32::timer::simple_pwm::PwmPin;
-use embassy_stm32::{bind_interrupts, gpio, timer, Config};
-use embassy_stm32::{can, usb};
-use embassy_stm32::{interrupt, peripherals};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::channel::Channel;
-use embassy_sync::mutex::Mutex;
-use embassy_time::Delay;
-use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use embassy_usb::Builder;
-use foc::angle_sensor::as5048::As5048;
-use foc::angle_sensor::Direction;
-use foc::current_sensor::ISensor;
-use foc::{LoopMode, MotorParams, Pid, Pll2};
 use static_cell::StaticCell;
+
+use embassy_executor::{Executor, InterruptExecutor};
+use embassy_stm32::{
+    adc::{Adc, SampleTime},
+    bind_interrupts,
+    can::{self, config::FdCanConfig},
+    gpio::{self, Output},
+    interrupt, peripherals,
+    spi::{self, Spi, MODE_1},
+    time::{khz, mhz},
+    timer::{
+        self,
+        complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin},
+        low_level::CountingMode,
+        simple_pwm::PwmPin,
+    },
+    usb, Config,
+};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
+use embassy_usb::{
+    class::cdc_acm::{CdcAcmClass, State},
+    Builder,
+};
+
+use foc::{
+    angle_sensor::{as5048::As5048, Direction},
+    current_sensor::ISensor,
+    Foc, LoopMode, MotorParams, Pid, Pll2,
+};
 
 use crate::interface::{Adcs, Pwms, VbusAdc};
 
@@ -58,7 +69,6 @@ enum SharedEvent {
     },
 }
 
-type FocMutex = Mutex<CriticalSectionRawMutex, Option<foc::Foc>>;
 static SHAREDCHANNEL: Channel<CriticalSectionRawMutex, SharedEvent, 64> = Channel::new();
 
 #[entry]
@@ -88,7 +98,6 @@ fn main() -> ! {
     info!("System starting...");
 
     ////////////////////////////////////////////////////////////
-    // Init USB Driver
     info!("Init USB Driver...");
     let (usb, usb_class) = {
         let driver = usb::Driver::new(p.USB, Irqs, p.PA12, p.PA11);
@@ -129,11 +138,8 @@ fn main() -> ! {
     info!("Init CAN Driver...");
     let can = {
         let mut can = can::CanConfigurator::new(p.FDCAN1, p.PB8, p.PB9, Irqs);
-        can.set_extended_filter(
-            can::filter::ExtendedFilterSlot::_0,
-            can::filter::ExtendedFilter::accept_all_into_fifo1(),
-        );
-        can.set_bitrate(250_000);
+        can.set_config(FdCanConfig::default());
+        // can.set_bitrate(250_000);
         // can.set_fd_data_bitrate(1_000_000, false);  // use fdcan
         // let mut can = can.start(can::FdcanOperatingMode::InternalLoopbackMode);
         can.start(can::OperatingMode::NormalOperationMode)
@@ -175,9 +181,9 @@ fn main() -> ! {
     //     adc
     // };
     let adc2 = {
-        let mut adc = Adc::new(p.ADC2, &mut Delay);
+        let mut adc = Adc::new(p.ADC2);
         adc.set_sample_time(SampleTime::CYCLES2_5);
-        adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
+        adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
         adc
     };
     let mut uvw_adcs = Adcs::new();
@@ -188,7 +194,7 @@ fn main() -> ! {
     let vbus_adc = VbusAdc::new(adc2, p.PC5);
     // let mut uvw_adcs = Adcs::new(adc1, p.PA0, p.PA1, p.PA2);
 
-    let foc = foc::Foc::new(
+    let foc: foc::Foc = foc::Foc::new(
         MotorParams {
             pole_num: 7,
             resistance: None,
@@ -243,17 +249,15 @@ fn main() -> ! {
         1. / 8_000.,
         1. / 1_000.,
     );
-    static FOC: FocMutex = Mutex::new(None);
-    block_on(async {
-        *FOC.lock().await = Some(foc);
-    });
+
+    // block_on(async {
+    //     *FOC.lock().await = Some(foc);
+    // });
 
     let mut spi_config = spi::Config::default();
     spi_config.mode = MODE_1;
     spi_config.frequency = mhz(10);
-    let spi = Spi::new(
-        p.SPI1, p.PB3, p.PB5, p.PB4, p.DMA1_CH1, p.DMA1_CH2, spi_config,
-    );
+    let spi = Spi::new_blocking(p.SPI1, p.PB3, p.PB5, p.PB4, spi_config);
 
     let as5048 = As5048::new(
         spi,
@@ -267,7 +271,7 @@ fn main() -> ! {
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::ADC1_2);
     spawner
         .spawn(task::current_loop(
-            &FOC,
+            unsafe { mem::transmute::<&Foc, &mut Foc>(&foc) },
             SHAREDCHANNEL.sender(),
             vbus_adc,
             uvw_adcs,
@@ -276,8 +280,16 @@ fn main() -> ! {
             CortexDelay::new(),
         ))
         .unwrap();
-    spawner.spawn(task::velocity_loop(&FOC)).unwrap();
-    spawner.spawn(task::position_loop(&FOC)).unwrap();
+    spawner
+        .spawn(task::velocity_loop(unsafe {
+            mem::transmute::<&Foc, &mut Foc>(&foc)
+        }))
+        .unwrap();
+    spawner
+        .spawn(task::position_loop(unsafe {
+            mem::transmute::<&Foc, &mut Foc>(&foc)
+        }))
+        .unwrap();
 
     info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());

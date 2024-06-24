@@ -1,5 +1,5 @@
 use cortex_m::prelude::_embedded_hal_blocking_delay_DelayUs;
-use embassy_stm32::adc::{Adc, AdcPin};
+use embassy_stm32::adc::Adc;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::timer::{AdvancedInstance4Channel, Channel};
 use foc::driver::interface;
@@ -7,7 +7,7 @@ use foc::driver::interface;
 pub struct VbusAdc<T, A>
 where
     T: embassy_stm32::adc::Instance,
-    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+    A: embassy_stm32::adc::AdcChannel<T>,
 {
     adc: Adc<'static, T>,
     pin: A,
@@ -16,7 +16,7 @@ where
 impl<T, A> VbusAdc<T, A>
 where
     T: embassy_stm32::adc::Instance,
-    A: AdcPin<T> + embassy_stm32::gpio::Pin,
+    A: embassy_stm32::adc::AdcChannel<T>,
 {
     pub fn new(adc: Adc<'static, T>, pin: A) -> Self {
         Self { adc, pin }
@@ -52,11 +52,11 @@ impl Adcs {
         use embassy_stm32::pac::adc::vals;
         use embassy_stm32::pac::ADC1;
         ADC1.cfgr().modify(|w| {
-            w.set_res(vals::Res::BITS16); // 分辨率
+            w.set_res(vals::Res::BITS12); // 分辨率
                                           // w.set_autdly(false); // low power auto wait
 
             w.set_discen(false);
-            w.set_dmngt(vals::Dmngt::DR); // DMA transfer disable. Only save value in DR
+            w.set_dmaen(vals::Dmaen::DISABLE);// DMA transfer disable. Only save value in DR
             w.set_ovrmod(vals::Ovrmod::PRESERVE);
             w.set_cont(false); // Countinuous mode
             w.set_exten(vals::Exten::DISABLED);
@@ -83,15 +83,15 @@ impl Adcs {
 
         // 配置注入通道
         embassy_stm32::pac::ADC1.jsqr().modify(|w| {
-            w.set_jsq1(0, 1);
-            w.set_jsq1(1, 2);
-            w.set_jsq1(2, 3);
+            w.set_jsq(0, 1);
+            w.set_jsq(1, 2);
+            w.set_jsq(2, 3);
         });
         // 配置采样周期
-        embassy_stm32::pac::ADC1.smpr(0).modify(|w| {
-            w.set_smp(0, vals::SampleTime::CYCLES1_5);
-            w.set_smp(1, vals::SampleTime::CYCLES1_5);
-            w.set_smp(2, vals::SampleTime::CYCLES1_5);
+        embassy_stm32::pac::ADC1.smpr().modify(|w| {
+            w.set_smp(0, vals::SampleTime::CYCLES2_5);
+            w.set_smp(1, vals::SampleTime::CYCLES2_5);
+            w.set_smp(2, vals::SampleTime::CYCLES2_5);
         });
         // 配置单端输入
         ADC1.difsel().modify(|w| {
@@ -104,7 +104,7 @@ impl Adcs {
         // debug!("Calibration ADC");
         ADC1.cr().modify(|w| {
             w.set_adcaldif(vals::Adcaldif::SINGLEENDED);
-            w.set_adcallin(true);
+            w.set_adcal(true);
         });
         ADC1.cr().modify(|w| w.set_adcal(true));
         while ADC1.cr().read().adcal() {}
