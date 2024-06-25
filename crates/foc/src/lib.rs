@@ -114,7 +114,6 @@ impl Foc {
     #[allow(dead_code)]
     pub fn new(
         motor_params: MotorParams,
-        loop_mode: LoopMode,
         i_sensor: ISensor,
         current_loop_dt: f32,
         velocity_loop_dt: f32,
@@ -122,7 +121,7 @@ impl Foc {
     ) -> Self {
         Self {
             motor_params,
-            loop_mode,
+            loop_mode: LoopMode::None,
             i_sensor,
             current_state: CurrentState {
                 i_uvw: (0., 0., 0.),
@@ -135,6 +134,11 @@ impl Foc {
             velocity_loop_dt,
             position_loop_dt,
         }
+    }
+
+    pub fn set_mode(mut self, loop_mode: LoopMode) -> Self {
+        self.loop_mode = loop_mode;
+        self
     }
 
     pub fn init(&mut self, angle_sensor: Option<&mut impl AngleSensor>) {

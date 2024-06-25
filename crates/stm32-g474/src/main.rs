@@ -201,6 +201,18 @@ fn main() -> ! {
             inductance: None,
             encoder_offset: Some(-2.6825993),
         },
+        ISensor::new(
+            0.005,
+            16.0,
+            &mut pwms,
+            &mut embassy_time::Delay,
+            &mut uvw_adcs,
+        ),
+        1. / 20_000.,
+        1. / 8_000.,
+        1. / 1_000.,
+    )
+    .set_mode(
         LoopMode::PositionVelocityWithSensor {
             current_pid: (
                 foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
@@ -238,16 +250,6 @@ fn main() -> ! {
         // LoopMode::Calibration {
         //     has_encoder_offset: false,
         // },
-        ISensor::new(
-            0.005,
-            16.0,
-            &mut pwms,
-            &mut embassy_time::Delay,
-            &mut uvw_adcs,
-        ),
-        1. / 20_000.,
-        1. / 8_000.,
-        1. / 1_000.,
     );
 
     // block_on(async {
