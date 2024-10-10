@@ -23,7 +23,7 @@ where
     }
 
     pub fn get_voltage(&mut self) -> f32 {
-        self.adc.read(&mut self.pin) as f32 * 3.3 / 4096. * 16.0
+        self.adc.blocking_read(&mut self.pin) as f32 * 3.3 / 4096. * 16.0
     }
 }
 
