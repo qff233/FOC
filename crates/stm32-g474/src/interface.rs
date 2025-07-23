@@ -56,7 +56,7 @@ impl Adcs {
                                           // w.set_autdly(false); // low power auto wait
 
             w.set_discen(false);
-            w.set_dmaen(vals::Dmaen::DISABLE);// DMA transfer disable. Only save value in DR
+            w.set_dmaen(vals::Dmaen::DISABLE); // DMA transfer disable. Only save value in DR
             w.set_ovrmod(vals::Ovrmod::PRESERVE);
             w.set_cont(false); // Countinuous mode
             w.set_exten(vals::Exten::DISABLED);
@@ -72,7 +72,7 @@ impl Adcs {
         ADC1.jsqr().modify(|w| {
             w.set_jextsel(1);
             w.set_jl(2);
-            w.set_jexten(vals::Jexten::FALLINGEDGE); // 触发边缘
+            w.set_jexten(vals::Exten::FALLING_EDGE); // 触发边缘
         });
 
         ADC1.cr().modify(|w| {
@@ -95,15 +95,15 @@ impl Adcs {
         });
         // 配置单端输入
         ADC1.difsel().modify(|w| {
-            w.set_difsel(0, vals::Difsel::SINGLEENDED);
-            w.set_difsel(1, vals::Difsel::SINGLEENDED);
-            w.set_difsel(2, vals::Difsel::SINGLEENDED);
+            w.set_difsel(0, vals::Difsel::SINGLE_ENDED);
+            w.set_difsel(1, vals::Difsel::SINGLE_ENDED);
+            w.set_difsel(2, vals::Difsel::SINGLE_ENDED);
         });
 
         // 开始校准ADC
         // debug!("Calibration ADC");
         ADC1.cr().modify(|w| {
-            w.set_adcaldif(vals::Adcaldif::SINGLEENDED);
+            w.set_adcaldif(vals::Adcaldif::SINGLE_ENDED);
             w.set_adcal(true);
         });
         ADC1.cr().modify(|w| w.set_adcal(true));

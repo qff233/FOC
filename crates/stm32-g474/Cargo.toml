@@ -1,6 +1,6 @@
 [package]
 name = "stm32-g474"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
@@ -8,6 +8,7 @@ embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
     "time-driver-tim3",
     "stm32g474re",
+    "single-bank",
     "memory-x",
     "unstable-pac",
     "exti",
@@ -20,14 +21,12 @@ embassy-executor = { git = "https://github.com/embassy-rs/embassy", features = [
     "executor-thread",
     "executor-interrupt",
     "defmt",
-    "integrated-timers",
-    "task-arena-size-8192"
 ] }
 embassy-time = { git = "https://github.com/embassy-rs/embassy", features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
+# embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
 embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = [
    "defmt",
 ] }

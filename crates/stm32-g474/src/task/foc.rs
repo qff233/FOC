@@ -18,7 +18,7 @@ use crate::{
 pub async fn current_loop(
     foc: &'static mut Foc,
     comm_sender: Sender<'static, CriticalSectionRawMutex, SharedEvent, 64>,
-    mut vbus_adc: VbusAdc<peripherals::ADC2, peripherals::PC5>,
+    mut vbus_adc: VbusAdc<peripherals::ADC2, embassy_stm32::Peri<'static, peripherals::PC5>>,
     // mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
     mut uvw_adcs: Adcs,
     mut pwm: Pwms<peripherals::TIM1>,

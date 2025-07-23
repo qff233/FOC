@@ -149,12 +149,12 @@ fn main() -> ! {
     // Init PWM
     info!("Init PWM Driver...");
     let mut pwm = {
-        let u_h = PwmPin::new_ch1(p.PA8, embassy_stm32::gpio::OutputType::PushPull);
-        let u_l = ComplementaryPwmPin::new_ch1(p.PB13, gpio::OutputType::PushPull);
-        let v_h = PwmPin::new_ch2(p.PA9, embassy_stm32::gpio::OutputType::PushPull);
-        let v_l = ComplementaryPwmPin::new_ch2(p.PB14, gpio::OutputType::PushPull);
-        let w_h = PwmPin::new_ch3(p.PA10, embassy_stm32::gpio::OutputType::PushPull);
-        let w_l = ComplementaryPwmPin::new_ch3(p.PB15, gpio::OutputType::PushPull);
+        let u_h = PwmPin::new(p.PA8, gpio::OutputType::PushPull);
+        let u_l = ComplementaryPwmPin::new(p.PB13, gpio::OutputType::PushPull);
+        let v_h = PwmPin::new(p.PA9, embassy_stm32::gpio::OutputType::PushPull);
+        let v_l = ComplementaryPwmPin::new(p.PB14, gpio::OutputType::PushPull);
+        let w_h = PwmPin::new(p.PA10, embassy_stm32::gpio::OutputType::PushPull);
+        let w_l = ComplementaryPwmPin::new(p.PB15, gpio::OutputType::PushPull);
         ComplementaryPwm::new(
             p.TIM1,
             Some(u_h),
