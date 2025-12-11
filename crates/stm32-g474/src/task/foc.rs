@@ -1,6 +1,7 @@
 use defmt::error;
+use embassy_stm32::adc::SampleTime;
 use embassy_stm32::gpio::Output;
-use embassy_stm32::mode;
+use embassy_stm32::spi::mode;
 use embassy_stm32::{peripherals, spi::Spi};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::Timer;
@@ -22,14 +23,17 @@ pub async fn current_loop(
     // mut uvw_adcs: Adcs<peripherals::ADC1, peripherals::PA0, peripherals::PA1, peripherals::PA2>,
     mut uvw_adcs: Adcs,
     mut pwm: Pwms<peripherals::TIM1>,
-    mut angle_sensor: As5048<Spi<'static, mode::Blocking>, Output<'static>>,
+    mut angle_sensor: As5048<
+        Spi<'static, embassy_stm32::mode::Blocking, mode::Master>,
+        Output<'static>,
+    >,
     delay: CortexDelay,
 ) {
     // let mut angle_sensor = foc::angle_sensor::TestAngleSensor::new(180_f32.to_radians(), 0.00005);
     foc.init(Some(&mut angle_sensor));
     loop {
         // let begin = embassy_time::Instant::now();
-        let bus_voltage = vbus_adc.get_voltage();
+        let bus_voltage = vbus_adc.get_voltage(SampleTime::CYCLES12_5);
 
         if let Err(e) = foc.current_tick(
             bus_voltage,

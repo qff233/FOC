@@ -180,12 +180,7 @@ fn main() -> ! {
     //     adc.set_resolution(embassy_stm32::adc::Resolution::BITS16);
     //     adc
     // };
-    let adc2 = {
-        let mut adc = Adc::new(p.ADC2);
-        adc.set_sample_time(SampleTime::CYCLES2_5);
-        adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
-        adc
-    };
+    let adc2 = Adc::new(p.ADC2, Default::default());
     let mut uvw_adcs = Adcs::new();
 
     ////////////////////////////////////////////////////////////
@@ -199,7 +194,7 @@ fn main() -> ! {
             pole_num: 7,
             resistance: None,
             inductance: None,
-            encoder_offset: Some(-2.6825993),
+            encoder_offset: Some(-2.5893073),
         },
         ISensor::new(
             0.005,
@@ -213,25 +208,25 @@ fn main() -> ! {
         1. / 1_000.,
     )
     .set_mode(
-        LoopMode::PositionVelocityWithSensor {
-            current_pid: (
-                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
-                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
-            ),
-            velocity_pid: Pid::new(0.4, 0.001, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
-            position_pid: Pid::new(10.0, 5.5, 0.0, 1. / 1_000., 0.0, 60., 1.5),
-            pll: Pll2::new(0.005, 0.05, 1. / 8_000.),
-            expect_position: (0, 0.0),
-        },
-        // LoopMode::VelocityWithSensor {
+        // LoopMode::PositionVelocityWithSensor {
         //     current_pid: (
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
         //     ),
         //     velocity_pid: Pid::new(0.4, 0.001, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+        //     position_pid: Pid::new(10.0, 5.5, 0.0, 1. / 1_000., 0.0, 60., 1.5),
         //     pll: Pll2::new(0.005, 0.05, 1. / 8_000.),
-        //     expect_velocity: 360_f32.to_radians(),
+        //     expect_position: (0, 0.0),
         // },
+        LoopMode::VelocityWithSensor {
+            current_pid: (
+                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
+                foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // iq
+            ),
+            velocity_pid: Pid::new(0.4, 0.001, 0.0, 1. / 8_000., 0.0, 3.0, 3.0),
+            pll: Pll2::new(0.005, 0.05, 1. / 8_000.),
+            expect_velocity: 360_f32.to_radians(),
+        },
         // LoopMode::PositionWithSensor {
         //     current_pid: (
         //         foc::Pid::new(0.3925, 277.78, 0.0, 0.000_05, 0.0, 0.5, 0.5), // id
@@ -271,8 +266,8 @@ fn main() -> ! {
     info!("Init PWM Interrupt...");
 
     let spawner = EXECUTOR_FOC_LOOP.start(interrupt::ADC1_2);
-    spawner
-        .spawn(task::current_loop(
+    spawner.spawn(
+        task::current_loop(
             unsafe { mem::transmute::<&Foc, &mut Foc>(&foc) },
             SHAREDCHANNEL.sender(),
             vbus_adc,
@@ -280,28 +275,17 @@ fn main() -> ! {
             pwms,
             as5048,
             CortexDelay::new(),
-        ))
-        .unwrap();
-    spawner
-        .spawn(task::velocity_loop(unsafe {
-            mem::transmute::<&Foc, &mut Foc>(&foc)
-        }))
-        .unwrap();
-    spawner
-        .spawn(task::position_loop(unsafe {
-            mem::transmute::<&Foc, &mut Foc>(&foc)
-        }))
-        .unwrap();
+        )
+        .unwrap(),
+    );
+    spawner.spawn(task::velocity_loop(unsafe { mem::transmute::<&Foc, &mut Foc>(&foc) }).unwrap());
+    spawner.spawn(task::position_loop(unsafe { mem::transmute::<&Foc, &mut Foc>(&foc) }).unwrap());
 
     info!("Init exector");
     let executor = EXECUTOR_COMM.init(Executor::new());
     executor.run(|spawner| {
-        spawner
-            .spawn(task::usb_comm(usb, usb_class, SHAREDCHANNEL.receiver()))
-            .unwrap();
-        spawner
-            .spawn(task::can_comm(can, SHAREDCHANNEL.receiver()))
-            .unwrap();
+        spawner.spawn(task::usb_comm(usb, usb_class, SHAREDCHANNEL.receiver()).unwrap());
+        spawner.spawn(task::can_comm(can, SHAREDCHANNEL.receiver()).unwrap());
     });
 }
 

@@ -1,5 +1,6 @@
 use cortex_m::prelude::_embedded_hal_blocking_delay_DelayUs;
 use embassy_stm32::adc::Adc;
+use embassy_stm32::adc::BasicAdcRegs;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::timer::{AdvancedInstance4Channel, Channel};
 use foc::driver::interface;
@@ -22,8 +23,9 @@ where
         Self { adc, pin }
     }
 
-    pub fn get_voltage(&mut self) -> f32 {
-        self.adc.blocking_read(&mut self.pin) as f32 * 3.3 / 4096. * 16.0
+    pub fn get_voltage(&mut self, sample_time: <T::Regs as BasicAdcRegs>::SampleTime) -> f32 {
+        let voltage = self.adc.blocking_read(&mut self.pin, sample_time) as f32;
+        voltage * 3.3 / 4096. * 16.0
     }
 }
 
@@ -159,9 +161,9 @@ impl<T: AdvancedInstance4Channel> Pwms<T> {
 impl<T: AdvancedInstance4Channel> interface::Pwms for Pwms<T> {
     fn set_duty(&mut self, u: f32, v: f32, w: f32) {
         let max_duty = self.pwm.get_max_duty() as f32;
-        let u = (u * max_duty).max(0.0).min(max_duty) as u16;
-        let v = (v * max_duty).max(0.0).min(max_duty) as u16;
-        let w = (w * max_duty).max(0.0).min(max_duty) as u16;
+        let u = (u * max_duty).max(0.0).min(max_duty) as u32;
+        let v = (v * max_duty).max(0.0).min(max_duty) as u32;
+        let w = (w * max_duty).max(0.0).min(max_duty) as u32;
         self.pwm.set_duty(Channel::Ch1, u);
         self.pwm.set_duty(Channel::Ch2, v);
         self.pwm.set_duty(Channel::Ch3, w);
