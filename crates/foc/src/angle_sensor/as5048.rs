@@ -2,7 +2,6 @@ use core::f32::consts::PI;
 
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiBus;
-use micromath::F32Ext;
 
 use super::{AngleSensor, AngleSensorError, Direction};
 

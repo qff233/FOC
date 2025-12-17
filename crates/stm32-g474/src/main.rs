@@ -11,7 +11,7 @@ use static_cell::StaticCell;
 
 use embassy_executor::{Executor, InterruptExecutor};
 use embassy_stm32::{
-    adc::{Adc, SampleTime},
+    adc::Adc,
     bind_interrupts,
     can::{self, config::FdCanConfig},
     gpio::{self, Output},

@@ -17,7 +17,6 @@ use angle_sensor::AngleSensor;
 use core::f32::consts::PI;
 use current_sensor::ISensor;
 use driver::interface::{Adcs, Pwms};
-use micromath::F32Ext;
 use utils::{park, svpwm, AngleSinCos};
 
 pub enum SetError {

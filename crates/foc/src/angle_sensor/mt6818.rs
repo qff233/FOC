@@ -1,7 +1,6 @@
 use core::f32::consts::PI;
 
 use embedded_hal::{digital::OutputPin, spi::SpiBus};
-use micromath::F32Ext;
 
 use crate::angle_sensor::AngleSensor;
 

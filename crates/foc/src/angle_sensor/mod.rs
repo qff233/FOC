@@ -3,8 +3,6 @@ pub mod mt6818;
 
 use core::f32::consts::PI;
 
-use micromath::F32Ext;
-
 pub enum AngleSensorError {
     NoMagWarning,
     DataError,
