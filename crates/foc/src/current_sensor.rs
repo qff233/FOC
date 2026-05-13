@@ -39,7 +39,7 @@ impl ISensor {
     }
 
     #[allow(dead_code)]
-    pub fn get_currnet(&mut self, uvw_adcs: &mut dyn Adcs) -> (f32, f32, f32) {
+    pub fn get_current(&mut self, uvw_adcs: &mut dyn Adcs) -> (f32, f32, f32) {
         let (u, v, w) = uvw_adcs.get_voltage();
         let (u_offset, v_offset, w_offset) = self.voltage_offset;
         // debug!(
